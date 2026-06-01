@@ -1,6 +1,8 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createMcpApp } from '../src/mcpApp';
+import { createErpMcpServer } from '../src/mcpApp';
 import { createRestApp } from '../src/restApp';
 import { db } from '../src/store';
 
@@ -74,19 +76,77 @@ describe('ERP backend', () => {
     expect(db.orders[0].status).toBe('completed');
   });
 
-  it('parses image text and inserts order via MCP endpoints', async () => {
-    const mcpApp = createMcpApp();
+  it('parses text and inserts order via MCP tools', async () => {
+    const mcpServer = createErpMcpServer();
+    const client = new Client({ name: 'erp-test-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([
+      client.connect(clientTransport),
+      mcpServer.connect(serverTransport)
+    ]);
 
-    const parsed = await request(mcpApp).post('/tools/parse-order-image-text').send({
-      text: 'productId: 1\nproductName: Widget\nunit: pcs\nbuyPrice: 10\nsellPrice: 20\ncustomerId: 2\ndueDate: 2026-06-20\nstatus: pending'
+    const tools = await client.listTools();
+    expect(tools.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      'parse-order-text',
+      'orders.insert'
+    ]));
+
+    const parsed = await client.callTool({
+      name: 'parse-order-text',
+      arguments: {
+        text: 'productId: 1\nproductName: Widget\nunit: pcs\nbuyPrice: 10\nsellPrice: 20\ncustomerId: 2\ndueDate: 2026-06-20\nstatus: pending'
+      }
     });
 
-    expect(parsed.status).toBe(200);
-    expect(parsed.body.orderDraft.productName).toBe('Widget');
+    expect(parsed.structuredContent?.orderDraft).toMatchObject({
+      productName: 'Widget',
+      sellPrice: 20
+    });
 
-    const inserted = await request(mcpApp).post('/tools/orders.insert').send(parsed.body.orderDraft);
+    const inserted = await client.callTool({
+      name: 'orders.insert',
+      arguments: parsed.structuredContent?.orderDraft as Record<string, unknown>
+    });
 
-    expect(inserted.status).toBe(201);
-    expect(inserted.body.credit.totalAmount).toBe(20);
+    expect(inserted.structuredContent?.credit).toMatchObject({
+      totalAmount: 20,
+      status: 'pending'
+    });
+
+    await client.close();
+    await mcpServer.close();
+  });
+
+  it('accepts order images via MCP and reports OCR is not configured', async () => {
+    const mcpServer = createErpMcpServer();
+    const client = new Client({ name: 'erp-test-client', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([
+      client.connect(clientTransport),
+      mcpServer.connect(serverTransport)
+    ]);
+
+    const tools = await client.listTools();
+    expect(tools.tools.map((tool) => tool.name)).toContain('parse-order-image');
+
+    const parsed = await client.callTool({
+      name: 'parse-order-image',
+      arguments: {
+        imageBase64: Buffer.from('fake-image').toString('base64'),
+        mimeType: 'image/png'
+      }
+    });
+
+    expect(parsed.isError).toBe(true);
+    expect(parsed.structuredContent).toMatchObject({
+      status: 'ocr_not_configured',
+      acceptedImage: {
+        mimeType: 'image/png',
+        byteLength: 10
+      }
+    });
+
+    await client.close();
+    await mcpServer.close();
   });
 });

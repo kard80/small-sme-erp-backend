@@ -41,5 +41,12 @@ npm run dev
 
 ## MCP API
 
-- `POST /tools/parse-order-image-text`
-- `POST /tools/orders.insert`
+The MCP server uses Streamable HTTP at:
+
+- `POST /mcp`
+
+Available MCP tools:
+
+- `parse-order-text` (accepts OCR text and returns an order draft)
+- `parse-order-image` (accepts `imageBase64` + `mimeType`; OCR service integration pending)
+- `orders.insert`
