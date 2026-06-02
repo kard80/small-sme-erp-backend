@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { errorMessage, parseIdParam } from '../../shared/http';
+import { parseIdParam } from '../../shared/http';
 import { paymentSchema } from './schemas';
 import { financeService } from './service';
 
@@ -12,11 +12,7 @@ export const createFinanceRouter = () => {
       return res.status(400).json({ error: input.error.flatten() });
     }
 
-    try {
-      return res.status(201).json(await financeService.applyPayment(input.data));
-    } catch (error) {
-      return res.status(400).json({ error: errorMessage(error) });
-    }
+    return res.status(201).json(await financeService.applyPayment(input.data));
   });
 
   router.get('/payments', async (_req, res) => {
@@ -24,44 +20,40 @@ export const createFinanceRouter = () => {
   });
 
   router.get('/payments/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'payment');
+    const id = parseIdParam(req, res, 'รายการชำระเงิน');
     if (id === undefined) {
       return;
     }
 
     const payment = await financeService.getPayment(id);
     if (!payment) {
-      return res.status(404).json({ error: 'Financial transaction not found' });
+      return res.status(404).json({ error: 'ไม่พบธุรกรรมการเงิน' });
     }
 
     return res.json(payment);
   });
 
   router.patch('/payments/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'payment');
+    const id = parseIdParam(req, res, 'รายการชำระเงิน');
     const input = paymentSchema.safeParse(req.body);
     if (id === undefined) {
       return;
     }
     if (!input.success) {
-      return res.status(400).json({ error: 'Invalid request' });
+      return res.status(400).json({ error: 'คำขอไม่ถูกต้อง' });
     }
 
-    try {
-      return res.json(await financeService.replacePayment(id, input.data));
-    } catch (error) {
-      return res.status(400).json({ error: errorMessage(error) });
-    }
+    return res.json(await financeService.replacePayment(id, input.data));
   });
 
   router.delete('/payments/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'payment');
+    const id = parseIdParam(req, res, 'รายการชำระเงิน');
     if (id === undefined) {
       return;
     }
 
     if (!(await financeService.removePayment(id))) {
-      return res.status(404).json({ error: 'Financial transaction not found' });
+      return res.status(404).json({ error: 'ไม่พบธุรกรรมการเงิน' });
     }
 
     return res.status(204).send();

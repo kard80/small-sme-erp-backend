@@ -1,4 +1,5 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { UnauthorizedError } from '../../shared/errors';
 import { AuthTokenPair, AuthUser } from './types';
 
 interface AuthTokenPayload extends jwt.JwtPayload {
@@ -56,12 +57,12 @@ const toAuthUser = (payload: AuthTokenPayload): AuthUser => ({
 const verifyToken = (token: string, secret: string, tokenType: AuthTokenPayload['tokenType']) => {
   const decoded = jwt.verify(token, secret);
   if (!decoded || typeof decoded === 'string') {
-    throw new Error('Invalid token');
+    throw new UnauthorizedError('โทเค็นไม่ถูกต้อง');
   }
 
   const payload = decoded as AuthTokenPayload;
   if (payload.tokenType !== tokenType || !payload.sub || !payload.username) {
-    throw new Error('Invalid token');
+    throw new UnauthorizedError('โทเค็นไม่ถูกต้อง');
   }
 
   return payload;
@@ -69,7 +70,7 @@ const verifyToken = (token: string, secret: string, tokenType: AuthTokenPayload[
 
 export const login = (username: string, password: string) => {
   if (username !== 'admin' || password !== '1234') {
-    throw new Error('Invalid username or password');
+    throw new UnauthorizedError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   }
 
   return issueTokenPair(temporaryUser);

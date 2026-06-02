@@ -13,13 +13,13 @@ declare global {
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: 'ไม่มีสิทธิ์เข้าถึง' });
     return;
   }
 
   const token = authHeader.slice('Bearer '.length).trim();
   if (!token) {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: 'ไม่มีสิทธิ์เข้าถึง' });
     return;
   }
 
@@ -27,6 +27,6 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     req.authUser = verifyAccessToken(token);
     next();
   } catch {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: 'ไม่มีสิทธิ์เข้าถึง' });
   }
 };

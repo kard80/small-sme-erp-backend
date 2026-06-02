@@ -20,7 +20,7 @@ export const createProductRouter = () => {
 
   router.post('/import-excel', upload.single('file'), async (req, res) => {
     if (!req.file) {
-      return res.status(400).json({ error: 'Excel file is required' });
+      return res.status(400).json({ error: 'กรุณาอัปโหลดไฟล์ Excel' });
     }
 
     const { default: readXlsxFile } = await import('read-excel-file/node');
@@ -39,31 +39,31 @@ export const createProductRouter = () => {
   });
 
   router.patch('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'product');
+    const id = parseIdParam(req, res, 'สินค้า');
     const input = productUpdateSchema.safeParse(req.body);
     if (id === undefined) {
       return;
     }
     if (!input.success) {
-      return res.status(400).json({ error: 'Invalid request' });
+      return res.status(400).json({ error: 'คำขอไม่ถูกต้อง' });
     }
 
     const product = await productService.updateProduct(id, input.data);
     if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ error: 'ไม่พบสินค้า' });
     }
 
     return res.json(product);
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'product');
+    const id = parseIdParam(req, res, 'สินค้า');
     if (id === undefined) {
       return;
     }
 
     if (!(await productService.removeProduct(id))) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ error: 'ไม่พบสินค้า' });
     }
 
     return res.status(204).send();

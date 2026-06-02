@@ -1,4 +1,5 @@
 import { ClientSession } from 'mongoose';
+import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { runInTransaction } from '../../shared/persistence';
 import { financeRepository } from '../finance/repository';
 import { CreditStatus, CustomerCredit, EntityPatch, NewEntity, OrderStatus } from '../../shared/types';
@@ -102,11 +103,11 @@ export const creditService = {
   async adjustPaidAmount(id: number, delta: number, session?: ClientSession) {
     const credit = await creditRepository.findById(id, session);
     if (!credit) {
-      throw new Error('Customer credit not found');
+      throw new NotFoundError('ไม่พบเครดิตลูกค้า');
     }
 
     if (credit.status === 'cancelled' && delta > 0) {
-      throw new Error('Cannot pay cancelled customer credit');
+      throw new BadRequestError('ไม่สามารถชำระเครดิตลูกค้าที่ถูกยกเลิกได้');
     }
 
     const paidAmount = Math.max(0, credit.paidAmount + delta);

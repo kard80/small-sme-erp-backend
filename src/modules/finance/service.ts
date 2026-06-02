@@ -1,4 +1,5 @@
 import { ClientSession } from 'mongoose';
+import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { creditService } from '../credit/service';
 import { orderService } from '../sales/service';
 import { runInTransaction } from '../../shared/persistence';
@@ -17,10 +18,10 @@ export const financeService = {
     return runInTransaction(async (session) => {
       const credit = await creditService.getCustomerCredit(input.customerCreditId, session);
       if (!credit) {
-        throw new Error('Customer credit not found');
+        throw new NotFoundError('ไม่พบเครดิตลูกค้า');
       }
       if (credit.status === 'cancelled') {
-        throw new Error('Cannot pay cancelled customer credit');
+        throw new BadRequestError('ไม่สามารถชำระเครดิตลูกค้าที่ถูกยกเลิกได้');
       }
 
       const payment = await financeRepository.create(input, session);
@@ -42,15 +43,15 @@ export const financeService = {
     return runInTransaction(async (session) => {
       const previous = await financeRepository.findById(id, session);
       if (!previous) {
-        throw new Error('Financial transaction not found');
+        throw new NotFoundError('ไม่พบธุรกรรมการเงิน');
       }
 
       const nextCredit = await creditService.getCustomerCredit(nextInput.customerCreditId, session);
       if (!nextCredit) {
-        throw new Error('Customer credit not found');
+        throw new NotFoundError('ไม่พบเครดิตลูกค้า');
       }
       if (nextCredit.status === 'cancelled') {
-        throw new Error('Cannot pay cancelled customer credit');
+        throw new BadRequestError('ไม่สามารถชำระเครดิตลูกค้าที่ถูกยกเลิกได้');
       }
 
       await creditService.adjustPaidAmount(previous.customerCreditId, -previous.amount, session);
@@ -58,7 +59,7 @@ export const financeService = {
 
       const updated = await financeRepository.update(id, nextInput, session);
       if (!updated) {
-        throw new Error('Financial transaction not found');
+        throw new NotFoundError('ไม่พบธุรกรรมการเงิน');
       }
 
       await creditService.adjustPaidAmount(updated.customerCreditId, updated.amount, session);

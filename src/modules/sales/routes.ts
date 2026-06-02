@@ -25,32 +25,32 @@ export const createOrderRouter = () => {
   });
 
   router.patch('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'order');
+    const id = parseIdParam(req, res, 'คำสั่งซื้อ');
     const input = orderUpdateSchema.safeParse(req.body);
     if (id === undefined) {
       return;
     }
     if (!input.success) {
-      return res.status(400).json({ error: 'Invalid request' });
+      return res.status(400).json({ error: 'คำขอไม่ถูกต้อง' });
     }
 
     const order = await orderService.updateOrder(id, input.data);
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
     }
 
     return res.json(order);
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'order');
+    const id = parseIdParam(req, res, 'คำสั่งซื้อ');
     if (id === undefined) {
       return;
     }
 
     const removed = await orderService.removeOrder(id);
     if (!removed) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
     }
 
     return res.status(204).send();

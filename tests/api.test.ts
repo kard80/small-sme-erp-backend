@@ -9,6 +9,7 @@ import {
   ProductModel
 } from '../src/shared/persistence';
 import { createRestApp } from '../src/restApp';
+import { productService } from '../src/modules/product/service';
 
 const describeIfMongo = process.env.MONGODB_URI ? describe : describe.skip;
 
@@ -123,6 +124,108 @@ describeIfMongo('ERP backend', () => {
     expect(updated.body.defaultBuyPrice).toBe(100);
     expect(updated.body.sellPrice).toBe(175);
     expect(updated.body.status).toBe('inactive');
+  });
+
+  it('returns JSON client errors from the fallback handler for uncaught route failures', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const first = await request(app)
+      .post('/api/v1/products')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        productName: 'Widget A',
+        unit: 'pcs',
+        sellPrice: 150
+      });
+
+    expect(first.status).toBe(201);
+
+    const duplicate = await request(app)
+      .post('/api/v1/products')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        productName: 'Widget A',
+        unit: 'pcs',
+        sellPrice: 150
+      });
+
+    expect(duplicate.status).toBe(400);
+    expect(duplicate.body).toEqual({ error: 'ชื่อสินค้ามีอยู่แล้ว' });
+  });
+
+  it('returns JSON when the request body cannot be parsed', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const response = await request(app)
+      .post('/api/v1/products')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send('{"productName":"Broken JSON"');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'ข้อมูล JSON ไม่ถูกต้อง' });
+  });
+
+  it('returns unauthorized errors from sync auth routes through the fallback handler', async () => {
+    const app = createRestApp();
+
+    const response = await request(app).post('/api/v1/auth/login').send({
+      username: 'admin',
+      password: 'wrong-password'
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
+  });
+
+  it('returns failed imported products with reasons during product import', async () => {
+    await ProductModel.create({
+      id: 99,
+      productName: 'Existing Widget',
+      unit: 'pcs',
+      sellPrice: 400,
+      status: 'active'
+    });
+
+    const result = await productService.importProducts([
+      ['Widget A', 'pcs', 100, 150, 'active'],
+      ['Widget A', 'pcs', 100, 150, 'active'],
+      ['Existing Widget', 'pcs', 200, 250, 'active'],
+      ['', 'pcs', 100, 150, 'active'],
+      ['Widget B', 'pcs', undefined, undefined, 'active']
+    ]);
+
+    expect(result.inserted).toBe(1);
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]).toMatchObject({
+      productName: 'Widget A',
+      unit: 'pcs',
+      defaultBuyPrice: 100,
+      sellPrice: 150,
+      status: 'active'
+    });
+    expect(result.failed).toEqual([
+      expect.objectContaining({
+        row: ['Widget A', 'pcs', 100, 150, 'active'],
+        productName: 'Widget A',
+        reason: 'Duplicate product name in import file'
+      }),
+      expect.objectContaining({
+        row: ['Existing Widget', 'pcs', 200, 250, 'active'],
+        productName: 'Existing Widget',
+        reason: 'Product name already exists'
+      }),
+      expect.objectContaining({
+        row: ['', 'pcs', 100, 150, 'active'],
+        reason: expect.stringContaining('productName:')
+      }),
+      expect.objectContaining({
+        row: ['Widget B', 'pcs', undefined, undefined, 'active'],
+        reason: expect.stringContaining('sellPrice:')
+      })
+    ]);
   });
 
   it('creates a paid credit when the order starts completed', async () => {

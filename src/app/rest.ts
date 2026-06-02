@@ -1,5 +1,6 @@
 import express from 'express';
 import { assertDbReady } from '../shared/persistence';
+import { fallbackErrorHandler } from '../shared/http';
 import { requireAuth } from '../modules/auth/middleware';
 import { createAuthRouter } from '../modules/auth/routes';
 import { createProductRouter } from '../modules/product/routes';
@@ -13,6 +14,17 @@ export const createRestApp = () => {
 
   const app = express();
   const apiV1 = express.Router();
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+      return res.status(204).send();
+    }
+
+    return next();
+  });
   app.use(express.json());
 
   app.get('/health', (_req, res) => {
@@ -27,6 +39,7 @@ export const createRestApp = () => {
   apiV1.use('/finances', requireAuth, createFinanceRouter());
 
   app.use('/api/v1', apiV1);
+  app.use(fallbackErrorHandler);
 
   return app;
 };

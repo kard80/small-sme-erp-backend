@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { errorMessage } from '../../shared/http';
 import { requireAuth } from './middleware';
 import { loginSchema, refreshSchema } from './schemas';
 import { login, refreshTokens } from './service';
@@ -13,11 +12,7 @@ export const createAuthRouter = () => {
       return res.status(400).json({ error: input.error.flatten() });
     }
 
-    try {
-      return res.json(login(input.data.username, input.data.password));
-    } catch (error) {
-      return res.status(401).json({ error: errorMessage(error, 'Unauthorized') });
-    }
+    return res.json(login(input.data.username, input.data.password));
   });
 
   router.post('/refresh', (req, res) => {
@@ -26,11 +21,7 @@ export const createAuthRouter = () => {
       return res.status(400).json({ error: input.error.flatten() });
     }
 
-    try {
-      return res.json(refreshTokens(input.data.refreshToken));
-    } catch {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    return res.json(refreshTokens(input.data.refreshToken));
   });
 
   router.get('/me', requireAuth, (req, res) => {
