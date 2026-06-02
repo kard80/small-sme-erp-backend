@@ -31,12 +31,15 @@ export const creditService = {
     sellPrice: number;
     status: OrderStatus;
   }, session?: ClientSession) {
+    const status: CreditStatus =
+      order.status === 'cancelled' ? 'cancelled' : order.status === 'completed' ? 'paid' : 'pending';
+    const paidAmount = status === 'paid' ? order.sellPrice : 0;
     return creditRepository.create({
       orderId: order.id,
       customerId: order.customerId,
       totalAmount: order.sellPrice,
-      paidAmount: 0,
-      status: order.status === 'cancelled' ? 'cancelled' : 'pending'
+      paidAmount,
+      status
     }, session);
   },
 
@@ -44,12 +47,12 @@ export const creditService = {
     return creditRepository.list();
   },
 
-  getCustomerCredit(id: number) {
-    return creditRepository.findById(id);
+  getCustomerCredit(id: number, session?: ClientSession) {
+    return creditRepository.findById(id, session);
   },
 
-  getCreditByOrderId(orderId: number) {
-    return creditRepository.findByOrderId(orderId);
+  getCreditByOrderId(orderId: number, session?: ClientSession) {
+    return creditRepository.findByOrderId(orderId, session);
   },
 
   async updateCreditFromOrder(
@@ -57,20 +60,30 @@ export const creditService = {
     input: { sellPrice?: number; customerId?: number; status?: OrderStatus },
     session?: ClientSession
   ) {
-    const credit = await creditRepository.findByOrderId(orderId);
+    const credit = await creditRepository.findByOrderId(orderId, session);
     if (!credit) {
       return undefined;
     }
 
+    const totalAmount = typeof input.sellPrice === 'number' ? input.sellPrice : credit.totalAmount;
+    const paidAmount = input.status === 'completed' ? totalAmount : Math.min(credit.paidAmount, totalAmount);
+    const status =
+      input.status === 'completed'
+        ? 'paid'
+        : input.status === 'cancelled'
+          ? 'cancelled'
+          : normalizeCreditStatus({ ...credit, totalAmount, paidAmount, status: credit.status });
+
     return creditRepository.update(credit.id, {
-      totalAmount: typeof input.sellPrice === 'number' ? input.sellPrice : credit.totalAmount,
+      totalAmount,
+      paidAmount,
       customerId: typeof input.customerId === 'number' ? input.customerId : credit.customerId,
-      status: input.status ? (input.status === 'completed' ? 'paid' : input.status) : credit.status
+      status
     }, session);
   },
 
   async updateCustomerCredit(id: number, input: Partial<Omit<CustomerCredit, 'id'>>, session?: ClientSession) {
-    const existing = await creditRepository.findById(id);
+    const existing = await creditRepository.findById(id, session);
     if (!existing) {
       return undefined;
     }
@@ -87,7 +100,7 @@ export const creditService = {
   },
 
   async adjustPaidAmount(id: number, delta: number, session?: ClientSession) {
-    const credit = await creditRepository.findById(id);
+    const credit = await creditRepository.findById(id, session);
     if (!credit) {
       throw new Error('Customer credit not found');
     }

@@ -23,8 +23,8 @@ export const financeRepository = {
     return PaymentTransactionModel.find().sort({ id: 1 }).lean<PaymentTransaction[]>();
   },
 
-  findById(id: number) {
-    return PaymentTransactionModel.findOne({ id }).lean<PaymentTransaction | null>();
+  findById(id: number, session?: ClientSession) {
+    return PaymentTransactionModel.findOne({ id }).session(session ?? null).lean<PaymentTransaction | null>();
   },
 
   update(id: number, input: Omit<PaymentTransaction, 'id'>, session?: ClientSession) {

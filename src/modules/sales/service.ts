@@ -37,12 +37,24 @@ export const salesService = {
   },
 
   async updateOrderStatusFromCredit(orderId: number, status: CreditStatus, session?: ClientSession) {
-    const order = await salesRepository.findById(orderId);
+    const order = await salesRepository.findById(orderId, session);
     if (!order || order.status === 'cancelled') {
       return order;
     }
 
     return salesRepository.update(orderId, { status: mapOrderStatusFromCredit(status) }, session);
+  },
+
+  async resetOrderStatusAfterCreditRemoval(orderId: number, session?: ClientSession) {
+    const order = await salesRepository.findById(orderId, session);
+    if (!order) {
+      return undefined;
+    }
+    if (order.status === 'cancelled') {
+      return order;
+    }
+
+    return salesRepository.update(orderId, { status: 'pending' }, session);
   },
 
   setOrderStatus(orderId: number, status: OrderStatus, session?: ClientSession) {

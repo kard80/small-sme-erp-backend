@@ -88,35 +88,41 @@ export const PaymentTransactionModel =
   models.PaymentTransaction || model<PaymentTransaction>('PaymentTransaction', paymentTransactionSchema);
 const CounterModel = models.Counter || model('Counter', counterSchema);
 
-// let initPromise: Promise<void> | undefined;
-let initPromise: boolean = false;
+let initPromise: Promise<void> | undefined;
 
 export const initiateDb = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
   if (!initPromise) {
     const uri = process.env.MONGODB_URI;
     if (!uri) {
       throw new Error('MONGODB_URI is required');
     }
 
-    try {
-      const connection = await mongoose.connect(uri, {
+    initPromise = mongoose
+      .connect(uri, {
         serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS || 5000)
+      })
+      .then((connection) => {
+        console.log('Connected to MongoDB:', connection.connection.host);
+      })
+      .catch((error) => {
+        console.error('Failed to connect to MongoDB', error);
+        initPromise = undefined;
+        throw error;
       });
-      console.log('Connected to MongoDB:', connection.connection.host);
-      initPromise = true;
-    } catch (error) {
-      console.error('Failed to connect to MongoDB', error);
-      throw error;
-    }
   }
 
+  await initPromise;
 };
 
 export const disconnectPersistence = async () => {
-  initPromise = false;
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
   }
+  initPromise = undefined;
 };
 
 export const assertDbReady = () => {

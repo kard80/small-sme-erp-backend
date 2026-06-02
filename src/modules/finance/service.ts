@@ -6,7 +6,7 @@ import { PaymentTransaction } from '../../shared/types';
 import { financeRepository } from './repository';
 
 const syncOrderFromCredit = async (customerCreditId: number, session?: ClientSession) => {
-  const credit = await creditService.getCustomerCredit(customerCreditId);
+  const credit = await creditService.getCustomerCredit(customerCreditId, session);
   if (credit) {
     await salesService.updateOrderStatusFromCredit(credit.orderId, credit.status, session);
   }
@@ -15,7 +15,7 @@ const syncOrderFromCredit = async (customerCreditId: number, session?: ClientSes
 export const financeService = {
   applyPayment(input: Omit<PaymentTransaction, 'id'>) {
     return runInTransaction(async (session) => {
-      const credit = await creditService.getCustomerCredit(input.customerCreditId);
+      const credit = await creditService.getCustomerCredit(input.customerCreditId, session);
       if (!credit) {
         throw new Error('Customer credit not found');
       }
@@ -40,12 +40,12 @@ export const financeService = {
 
   replacePayment(id: number, nextInput: Omit<PaymentTransaction, 'id'>) {
     return runInTransaction(async (session) => {
-      const previous = await financeRepository.findById(id);
+      const previous = await financeRepository.findById(id, session);
       if (!previous) {
         throw new Error('Financial transaction not found');
       }
 
-      const nextCredit = await creditService.getCustomerCredit(nextInput.customerCreditId);
+      const nextCredit = await creditService.getCustomerCredit(nextInput.customerCreditId, session);
       if (!nextCredit) {
         throw new Error('Customer credit not found');
       }

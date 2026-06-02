@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { salesService } from '../sales/service';
-import { parseIdParam } from '../../shared/http';
+import { errorMessage, parseIdParam } from '../../shared/http';
+import { runInTransaction } from '../../shared/persistence';
 import { customerCreditSchema, customerCreditUpdateSchema } from './schemas';
-import { creditService, mapOrderStatusFromCredit } from './service';
+import { creditService } from './service';
 
 export const createCreditRouter = () => {
   const router = Router();
@@ -44,13 +45,29 @@ export const createCreditRouter = () => {
       return res.status(400).json({ error: 'Invalid request' });
     }
 
-    const credit = await creditService.updateCustomerCredit(id, input.data);
-    if (!credit) {
-      return res.status(404).json({ error: 'Customer credit not found' });
-    }
+    try {
+      const credit = await runInTransaction(async (session) => {
+        const updatedCredit = await creditService.updateCustomerCredit(id, input.data, session);
+        if (!updatedCredit) {
+          return undefined;
+        }
 
-    await salesService.setOrderStatus(credit.orderId, mapOrderStatusFromCredit(credit.status));
-    return res.json(credit);
+        const order = await salesService.updateOrderStatusFromCredit(updatedCredit.orderId, updatedCredit.status, session);
+        if (!order) {
+          throw new Error('Linked order not found');
+        }
+
+        return updatedCredit;
+      });
+
+      if (!credit) {
+        return res.status(404).json({ error: 'Customer credit not found' });
+      }
+
+      return res.json(credit);
+    } catch (error) {
+      return res.status(400).json({ error: errorMessage(error) });
+    }
   });
 
   router.delete('/customer-credits/:id', async (req, res) => {
@@ -59,12 +76,29 @@ export const createCreditRouter = () => {
       return;
     }
 
-    const removed = await creditService.removeCustomerCredit(id);
-    if (!removed) {
-      return res.status(404).json({ error: 'Customer credit not found' });
-    }
+    try {
+      const removed = await runInTransaction(async (session) => {
+        const deletedCredit = await creditService.removeCustomerCredit(id, session);
+        if (!deletedCredit) {
+          return undefined;
+        }
 
-    return res.status(204).send();
+        const order = await salesService.resetOrderStatusAfterCreditRemoval(deletedCredit.orderId, session);
+        if (!order) {
+          throw new Error('Linked order not found');
+        }
+
+        return deletedCredit;
+      });
+
+      if (!removed) {
+        return res.status(404).json({ error: 'Customer credit not found' });
+      }
+
+      return res.status(204).send();
+    } catch (error) {
+      return res.status(400).json({ error: errorMessage(error) });
+    }
   });
 
   return router;
