@@ -12,7 +12,6 @@ export type NewEntity<T extends MongoEntity, GeneratedKey extends keyof T> = Omi
 export type EntityPatch<T extends MongoEntity, GeneratedKey extends keyof T> = Partial<Omit<T, GeneratedKey | '_id'>>;
 
 export interface Product extends MongoEntity {
-  id: number;
   productName: string;
   unit: string;
   defaultBuyPrice?: number;
@@ -29,7 +28,7 @@ export interface Customer extends MongoEntity {
 
 export interface Order extends MongoEntity {
   id: number;
-  productId: number;
+  productId: string;
   productName: string;
   unit: string;
   buyPrice: number;
@@ -59,7 +58,7 @@ export interface PaymentTransaction extends MongoEntity {
 export type FinancialTransaction = PaymentTransaction;
 
 export interface CreateOrderInput {
-  productId: number;
+  productId: string;
   productName: string;
   unit: string;
   buyPrice: number;

@@ -1,8 +1,8 @@
 import { ClientSession } from 'mongoose';
-import { ProductModel, nextSequence } from '../../shared/persistence';
+import { ProductModel } from '../../shared/persistence';
 import { EntityPatch, NewEntity, Product } from '../../shared/types';
 
-const toProductCreateDoc = (input: NewEntity<Product, 'id'>) => ({
+const toProductCreateDoc = (input: NewEntity<Product, never>) => ({
   productName: input.productName,
   unit: input.unit,
   defaultBuyPrice: input.defaultBuyPrice,
@@ -10,8 +10,8 @@ const toProductCreateDoc = (input: NewEntity<Product, 'id'>) => ({
   status: input.status
 });
 
-const toProductUpdateDoc = (input: EntityPatch<Product, 'id'>) => {
-  const update: Partial<Omit<Product, 'id'>> = {};
+const toProductUpdateDoc = (input: EntityPatch<Product, never>) => {
+  const update: Partial<Omit<Product, '_id'>> = {};
 
   if (input.productName !== undefined) {
     update.productName = input.productName;
@@ -33,23 +33,15 @@ const toProductUpdateDoc = (input: EntityPatch<Product, 'id'>) => {
 };
 
 export const productRepository = {
-  async create(input: NewEntity<Product, 'id'>, session?: ClientSession) {
-    const [product] = await ProductModel.create(
-      [
-        {
-          id: await nextSequence('products', session),
-          ...toProductCreateDoc(input)
-        }
-      ],
-      { session }
-    );
+  async create(input: NewEntity<Product, never>, session?: ClientSession) {
+    const [product] = await ProductModel.create([toProductCreateDoc(input)], { session });
     return product.toObject();
   },
 
   async list(page: number, pageSize: number) {
     const [data, total] = await Promise.all([
       ProductModel.find({ status: 'active' })
-        .sort({ id: 1 })
+        .sort({ _id: 1 })
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .lean<Product[]>(),
@@ -59,17 +51,17 @@ export const productRepository = {
     return { data, page, pageSize, total };
   },
 
-  findById(id: number) {
-    return ProductModel.findOne({ id, status: 'active' }).lean<Product | null>();
+  findById(_id: string) {
+    return ProductModel.findOne({ _id, status: 'active' }).lean<Product | null>();
   },
 
   findByProductName(productName: string) {
     return ProductModel.findOne({ productName, status: 'active' }).lean<Product | null>();
   },
 
-  update(id: number, input: EntityPatch<Product, 'id'>, session?: ClientSession) {
+  update(_id: string, input: EntityPatch<Product, never>, session?: ClientSession) {
     return ProductModel.findOneAndUpdate(
-      { id },
+      { _id },
       { $set: toProductUpdateDoc(input) },
       { new: true, runValidators: true }
     )
@@ -77,10 +69,12 @@ export const productRepository = {
       .session(session ?? null);
   },
 
-  async remove(id: number, session?: ClientSession) {
-    const result = await ProductModel.updateOne({ id }, { $set: { status: 'inactive' } }, { runValidators: true }).session(
-      session ?? null
-    );
+  async remove(_id: string, session?: ClientSession) {
+    const result = await ProductModel.updateOne(
+      { _id },
+      { $set: { status: 'inactive' } },
+      { runValidators: true }
+    ).session(session ?? null);
     return result.matchedCount > 0;
   }
 };

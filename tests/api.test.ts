@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { extractProductImportRows } from '../src/modules/product/routes';
 import {
@@ -13,6 +14,7 @@ import { createRestApp } from '../src/restApp';
 import { productService } from '../src/modules/product/service';
 
 const describeIfMongo = process.env.MONGODB_URI ? describe : describe.skip;
+const testProductId = new Types.ObjectId().toString();
 
 const loginAsAdmin = async (app: ReturnType<typeof createRestApp>) => {
   const response = await request(app).post('/api/v1/auth/login').send({
@@ -33,7 +35,7 @@ const createOrder = async (
   app: ReturnType<typeof createRestApp>,
   accessToken: string,
   overrides: Partial<{
-    productId: number;
+    productId: string;
     productName: string;
     unit: string;
     buyPrice: number;
@@ -47,7 +49,7 @@ const createOrder = async (
     .post('/api/v1/orders')
     .set('Authorization', `Bearer ${accessToken}`)
     .send({
-      productId: 1,
+      productId: testProductId,
       productName: 'Widget A',
       unit: 'pcs',
       buyPrice: 100,
@@ -104,7 +106,6 @@ describeIfMongo('ERP backend', () => {
       });
 
     expect(created.status).toBe(201);
-    expect(created.body.id).toBeDefined();
     expect(created.body._id).toEqual(expect.any(String));
     expect(created.body.sellPrice).toBe(150);
     expect(created.body.defaultBuyPrice).toBeUndefined();
@@ -112,7 +113,7 @@ describeIfMongo('ERP backend', () => {
     expect(created.body.defaultSellPrice).toBeUndefined();
 
     const updated = await request(app)
-      .patch(`/api/v1/products/${created.body.id}`)
+      .patch(`/api/v1/products/${created.body._id}`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         defaultBuyPrice: 100,
@@ -183,7 +184,6 @@ describeIfMongo('ERP backend', () => {
 
   it('returns failed imported products with reasons during product import', async () => {
     await ProductModel.create({
-      id: 99,
       productName: 'Existing Widget',
       unit: 'pcs',
       sellPrice: 400,

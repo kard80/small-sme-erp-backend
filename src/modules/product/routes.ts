@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { parseIdParam, paginationSchema } from '../../shared/http';
+import { paginationSchema, parseObjectIdParam } from '../../shared/http';
 import { createProductSchema, productUpdateSchema } from './schemas';
 import { productService } from './service';
 
@@ -70,7 +70,7 @@ export const createProductRouter = () => {
   });
 
   router.patch('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'สินค้า');
+    const id = parseObjectIdParam(req, res, 'สินค้า');
     const input = productUpdateSchema.safeParse(req.body);
     if (id === undefined) {
       return;
@@ -88,7 +88,7 @@ export const createProductRouter = () => {
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'สินค้า');
+    const id = parseObjectIdParam(req, res, 'สินค้า');
     if (id === undefined) {
       return;
     }

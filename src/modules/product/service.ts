@@ -13,9 +13,9 @@ const formatRowReason = (issues: ZodIssue[]) =>
     })
     .join(', ');
 
-const ensureProductNameAvailable = async (productName: string, excludedId?: number) => {
+const ensureProductNameAvailable = async (productName: string, excludedId?: string) => {
   const existingProduct = await productRepository.findByProductName(productName);
-  if (existingProduct && existingProduct.id !== excludedId) {
+  if (existingProduct && existingProduct._id.toString() !== excludedId) {
     throw new BadRequestError('ชื่อสินค้ามีอยู่แล้ว');
   }
 };
@@ -30,7 +30,7 @@ export const productService = {
     return productRepository.list(page, pageSize);
   },
 
-  async updateProduct(id: number, input: Parameters<typeof productRepository.update>[1]) {
+  async updateProduct(id: string, input: Parameters<typeof productRepository.update>[1]) {
     if (input.productName !== undefined) {
       await ensureProductNameAvailable(input.productName, id);
     }
@@ -38,7 +38,7 @@ export const productService = {
     return productRepository.update(id, input);
   },
 
-  removeProduct(id: number) {
+  removeProduct(id: string) {
     return productRepository.remove(id);
   },
 

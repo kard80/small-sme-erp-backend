@@ -14,7 +14,6 @@ const productStatusValues: ProductStatus[] = ['active', 'inactive'];
 const productSchema = new Schema<Product>(
   {
     _id: { type: Schema.Types.ObjectId, auto: true },
-    id: { type: Number, required: true, unique: true },
     productName: { type: String, required: true, trim: true },
     unit: { type: String, required: true, trim: true },
     defaultBuyPrice: { type: Number, required: false, min: 0 },
@@ -42,7 +41,7 @@ const orderSchema = new Schema<Order>(
   {
     _id: { type: Schema.Types.ObjectId, auto: true },
     id: { type: Number, required: true, unique: true },
-    productId: { type: Number, required: true, index: true },
+    productId: { type: String, required: true, index: true, trim: true },
     productName: { type: String, required: true, trim: true },
     unit: { type: String, required: true, trim: true },
     buyPrice: { type: Number, required: true, min: 0 },

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const orderInputSchema = z.object({
-  productId: z.coerce.number().int().positive(),
+  productId: z.string().regex(/^[0-9a-fA-F]{24}$/),
   productName: z.string().min(1),
   unit: z.string().min(1),
   buyPrice: z.coerce.number().nonnegative(),

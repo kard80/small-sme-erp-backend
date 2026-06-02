@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { z } from 'zod';
 import { HttpError } from './errors';
 
@@ -17,6 +18,16 @@ export const parseIdParam = (req: Request, res: Response, label: string) => {
   }
 
   return id.data;
+};
+
+export const parseObjectIdParam = (req: Request, res: Response, label: string) => {
+  const id = req.params.id;
+  if (typeof id !== 'string' || !Types.ObjectId.isValid(id)) {
+    res.status(400).json({ error: `รหัส${label}ไม่ถูกต้อง` });
+    return undefined;
+  }
+
+  return id;
 };
 
 export const errorMessage = (error: unknown, fallback = 'เกิดข้อผิดพลาด') => {
