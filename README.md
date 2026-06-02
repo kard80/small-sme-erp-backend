@@ -2,8 +2,7 @@
 
 Node.js + TypeScript modular monolith backend for a small SME ERP with **two servers in one process**:
 
-- REST API server (default `3000`)
-- MCP server (default `3001`)
+- REST API server (default `8000`)
 
 ## Persistence
 

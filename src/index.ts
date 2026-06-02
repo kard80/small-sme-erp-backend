@@ -6,7 +6,7 @@ const start = async () => {
   require('dotenv').config()
   loadExternalEnv();
 
-  const restPort = Number(process.env.REST_PORT || 3000);
+  const restPort = Number(process.env.REST_PORT || 8000);
   await initiateDb();
 
   const restApp = createRestApp();

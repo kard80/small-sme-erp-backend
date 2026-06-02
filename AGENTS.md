@@ -7,7 +7,7 @@ This is a Node.js + TypeScript modular monolith backend for a small SME ERP. Sou
 ## Build, Test, and Development Commands
 
 - `npm install`: install dependencies from `package-lock.json`.
-- `npm run dev`: run `src/index.ts` with `tsx`; starts REST on `REST_PORT` or `3000` and MCP on `MCP_PORT` or `3001`.
+- `npm run dev`: run `src/index.ts` with `tsx`; starts REST on `REST_PORT` or `8000` and MCP on `MCP_PORT` or `3001`.
 - `npm run build`: compile TypeScript with `tsc -p tsconfig.json` into `dist/`.
 - `npm start`: run the compiled app from `dist/index.js`.
 - `npm test`: run Vitest once with the configured test suite.
