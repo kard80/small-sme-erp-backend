@@ -1,5 +1,15 @@
 import mongoose, { ClientSession, Schema, model, models } from 'mongoose';
-import { CreditStatus, Customer, CustomerCredit, Order, OrderStatus, PaymentTransaction, Product, ProductStatus } from './types';
+import {
+  CreditStatus,
+  Customer,
+  CustomerCredit,
+  Order,
+  OrderOcrUploadBatch,
+  OrderStatus,
+  PaymentTransaction,
+  Product,
+  ProductStatus
+} from './types';
 
 mongoose.set('strictQuery', true);
 
@@ -78,6 +88,18 @@ const paymentTransactionSchema = new Schema<PaymentTransaction>(
   baseSchemaOptions
 );
 
+const orderOcrUploadBatchSchema = new Schema<OrderOcrUploadBatch>(
+  {
+    _id: { type: Schema.Types.ObjectId, auto: true },
+    id: { type: Number, required: true, unique: true },
+    folderName: { type: String, required: true, trim: true },
+    filenames: { type: [String], required: true },
+    objectKeys: { type: [String], required: true },
+    createdAt: { type: String, required: true }
+  },
+  baseSchemaOptions
+);
+
 const counterSchema = new Schema(
   {
     _id: { type: Schema.Types.ObjectId, auto: true },
@@ -94,6 +116,8 @@ export const CustomerCreditModel =
   models.CustomerCredit || model<CustomerCredit>('CustomerCredit', customerCreditSchema);
 export const PaymentTransactionModel =
   models.PaymentTransaction || model<PaymentTransaction>('PaymentTransaction', paymentTransactionSchema);
+export const OrderOcrUploadBatchModel =
+  models.OrderOcrUploadBatch || model<OrderOcrUploadBatch>('OrderOcrUploadBatch', orderOcrUploadBatchSchema);
 const CounterModel = models.Counter || model('Counter', counterSchema);
 
 let initPromise: Promise<void> | undefined;

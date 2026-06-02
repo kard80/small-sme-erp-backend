@@ -57,6 +57,14 @@ export interface PaymentTransaction extends MongoEntity {
 
 export type FinancialTransaction = PaymentTransaction;
 
+export interface OrderOcrUploadBatch extends MongoEntity {
+  id: number;
+  folderName: string;
+  filenames: string[];
+  objectKeys: string[];
+  createdAt: string;
+}
+
 export interface CreateOrderInput {
   productId: string;
   productName: string;

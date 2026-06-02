@@ -1,6 +1,6 @@
 import { ClientSession } from 'mongoose';
-import { OrderModel, nextSequence } from '../../shared/persistence';
-import { CreateOrderInput, EntityPatch, Order } from '../../shared/types';
+import { OrderModel, OrderOcrUploadBatchModel, nextSequence } from '../../shared/persistence';
+import { CreateOrderInput, EntityPatch, Order, OrderOcrUploadBatch } from '../../shared/types';
 
 export const orderRepository = {
   async create(input: CreateOrderInput, session?: ClientSession) {
@@ -33,6 +33,26 @@ export const orderRepository = {
     return OrderModel.findOneAndUpdate({ id }, { $set: input }, { new: true, runValidators: true }).lean<
       Order | null
     >().session(session ?? null);
+  },
+
+  async createOcrUploadBatch(
+    input: Pick<OrderOcrUploadBatch, 'folderName' | 'filenames' | 'objectKeys' | 'createdAt'>,
+    session?: ClientSession
+  ) {
+    const [batch] = await OrderOcrUploadBatchModel.create(
+      [
+        {
+          id: await nextSequence('orderOcrUploadBatches', session),
+          folderName: input.folderName,
+          filenames: input.filenames,
+          objectKeys: input.objectKeys,
+          createdAt: input.createdAt
+        }
+      ],
+      { session }
+    );
+
+    return batch.toObject();
   },
 
   remove(id: number, session?: ClientSession) {

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { parseIdParam, paginationSchema } from '../../shared/http';
-import { orderInputSchema, orderUpdateSchema } from './schemas';
+import { orderImageOcrInputSchema, orderInputSchema, orderOcrUploadBatchInputSchema, orderUpdateSchema } from './schemas';
 import { orderService } from './service';
 
 export const createOrderRouter = () => {
@@ -22,6 +22,24 @@ export const createOrderRouter = () => {
     }
 
     return res.json(await orderService.listOrders(parsed.data.page, parsed.data.pageSize));
+  });
+
+  router.post('/ocr', async (req, res) => {
+    const input = orderImageOcrInputSchema.safeParse(req.body);
+    if (!input.success) {
+      return res.status(400).json({ error: input.error.flatten() });
+    }
+
+    return res.json(await orderService.parseOrderImageUrls(input.data.imageUrls));
+  });
+
+  router.post('/ocr/upload', async (req, res) => {
+    const input = orderOcrUploadBatchInputSchema.safeParse(req.body);
+    if (!input.success) {
+      return res.status(400).json({ error: input.error.flatten() });
+    }
+
+    return res.status(201).json(await orderService.createOcrUploadBatch(input.data.filenames));
   });
 
   router.patch('/:id', async (req, res) => {
