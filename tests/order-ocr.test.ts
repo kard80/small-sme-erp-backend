@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { orderService } from '../src/modules/sales/service';
+import { orderService } from '../src/modules/order/service';
 import { createOpenAiClient, getOpenAiModel } from '../src/shared/openai';
 import { productRepository } from '../src/modules/product/repository';
 import { customersRepository } from '../src/modules/customers/repository';

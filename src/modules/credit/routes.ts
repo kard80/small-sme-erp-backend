@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { orderService } from '../sales/service';
+import { orderService } from '../order/service';
 import { InternalServerError } from '../../shared/errors';
 import { parseIdParam } from '../../shared/http';
 import { runInTransaction } from '../../shared/persistence';

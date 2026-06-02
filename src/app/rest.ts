@@ -8,7 +8,7 @@ import { createProductRouter } from '../modules/product/routes';
 import { createCreditRouter } from '../modules/credit/routes';
 import { createCustomersRouter } from '../modules/customers/routes';
 import { createFinanceRouter } from '../modules/finance/routes';
-import { createOrderRouter } from '../modules/sales/routes';
+import { createOrderRouter } from '../modules/order/routes';
 
 export const createRestApp = () => {
   assertDbReady();

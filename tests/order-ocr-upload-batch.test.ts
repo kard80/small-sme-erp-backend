@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { orderRepository } from '../src/modules/sales/repository';
-import { orderOcrUploadBatchInputSchema } from '../src/modules/sales/schemas';
-import { orderService } from '../src/modules/sales/service';
+import { orderRepository } from '../src/modules/order/repository';
+import { orderOcrUploadBatchInputSchema } from '../src/modules/order/schemas';
+import { orderService } from '../src/modules/order/service';
 import { createSignedImageUploadUrl } from '../src/shared/gcs';
 
 vi.mock('../src/shared/gcs', () => ({

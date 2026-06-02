@@ -1,7 +1,7 @@
 import { ClientSession } from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { creditService } from '../credit/service';
-import { orderService } from '../sales/service';
+import { orderService } from '../order/service';
 import { runInTransaction } from '../../shared/persistence';
 import { NewEntity, PaymentTransaction } from '../../shared/types';
 import { financeRepository } from './repository';

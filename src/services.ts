@@ -1,5 +1,5 @@
 import { financeService } from './modules/finance/service';
-import { orderService } from './modules/sales/service';
+import { orderService } from './modules/order/service';
 import { mapOrderStatusFromCredit } from './modules/credit/service';
 
 export const createOrderWithCredit = orderService.createOrder;
