@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { parseIdParam, paginationSchema } from '../../shared/http';
-import { productSchema, productUpdateSchema } from './schemas';
+import { createProductSchema, productUpdateSchema } from './schemas';
 import { productService } from './service';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -10,12 +10,12 @@ export const createProductRouter = () => {
   const router = Router();
 
   router.post('/', async (req, res) => {
-    const input = productSchema.safeParse(req.body);
+    const input = createProductSchema.safeParse(req.body);
     if (!input.success) {
       return res.status(400).json({ error: input.error.flatten() });
     }
 
-    return res.status(201).json(await productService.createProduct(input.data));
+    return res.status(201).json(await productService.createProduct({ ...input.data, status: 'active' }));
   });
 
   router.post('/import-excel', upload.single('file'), async (req, res) => {

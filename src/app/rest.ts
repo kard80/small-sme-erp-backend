@@ -2,7 +2,7 @@ import express from 'express';
 import { assertDbReady } from '../shared/persistence';
 import { requireAuth } from '../modules/auth/middleware';
 import { createAuthRouter } from '../modules/auth/routes';
-import { createProductRouter } from '../modules/catalog/routes';
+import { createProductRouter } from '../modules/product/routes';
 import { createCreditRouter } from '../modules/credit/routes';
 import { createCustomersRouter } from '../modules/customers/routes';
 import { createFinanceRouter } from '../modules/finance/routes';

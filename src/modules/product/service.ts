@@ -1,4 +1,4 @@
-import { productSchema } from './schemas';
+import { importProductSchema } from './schemas';
 import { productRepository } from './repository';
 
 export const productService = {
@@ -22,7 +22,13 @@ export const productService = {
     const created = [];
     for (const row of rows) {
       const [productName, unit, defaultBuyPrice, sellPrice, status] = row;
-      const parsed = productSchema.safeParse({ productName, unit, defaultBuyPrice, sellPrice, status });
+      const parsed = importProductSchema.safeParse({
+        productName,
+        unit,
+        defaultBuyPrice,
+        sellPrice,
+        status: status ?? 'active'
+      });
       if (!parsed.success) {
         continue;
       }
