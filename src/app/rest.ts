@@ -1,6 +1,7 @@
 import express from 'express';
 import { assertDbReady } from '../shared/persistence';
 import { fallbackErrorHandler } from '../shared/http';
+import { isOpenAiConfigured } from '../shared/openai';
 import { requireAuth } from '../modules/auth/middleware';
 import { createAuthRouter } from '../modules/auth/routes';
 import { createProductRouter } from '../modules/product/routes';
@@ -28,7 +29,15 @@ export const createRestApp = () => {
   app.use(express.json());
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, server: 'rest' });
+    res.json({
+      ok: true,
+      server: 'rest',
+      integrations: {
+        openai: {
+          configured: isOpenAiConfigured()
+        }
+      }
+    });
   });
 
   apiV1.use('/auth', createAuthRouter());

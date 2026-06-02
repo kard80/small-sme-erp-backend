@@ -52,6 +52,42 @@ npm run dev -- --env-file=/absolute/path/to/.env
 
 The external env loader only fills variables that are not already set in the shell.
 
+## OpenAI API setup
+
+The project is wired to use the official OpenAI SDK via [src/shared/openai.ts](/Users/kardsahaphong/Desktop/coding/small-sme-erp-backend/src/shared/openai.ts).
+
+1. Add your credentials to `.env` or another env file:
+
+```bash
+OPENAI_API_KEY=your-key-here
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Optional settings:
+
+```bash
+OPENAI_BASE_URL=
+OPENAI_ORGANIZATION=
+OPENAI_PROJECT=
+```
+
+2. The REST health check reports whether OpenAI is configured:
+
+```bash
+curl http://localhost:8000/health
+```
+
+3. Use the shared helper from application code:
+
+```ts
+import { createOpenAiClient, getOpenAiModel } from './shared/openai';
+
+const client = createOpenAiClient();
+const model = getOpenAiModel();
+```
+
+The helper throws if `OPENAI_API_KEY` is missing, so API-backed features fail fast instead of silently misconfiguring.
+
 ## Tests
 
 The test suite is Mongo-backed. Set `MONGODB_URI` before running `npm test`.
@@ -93,18 +129,16 @@ All ERP REST endpoints require `Authorization: Bearer <accessToken>`.
 - `GET /api/finance/payments/:id`
 - `PATCH /api/finance/payments/:id`
 - `DELETE /api/finance/payments/:id`
+- `POST /api/v1/orders/ocr` (accepts `{ "imageUrls": ["https://..."] }` and returns an OCR-based order draft)
 
-## MCP API
+Example OCR request:
 
-The MCP server uses Streamable HTTP at:
-
-- `POST /mcp`
-
-Available MCP tools:
-
-- `sales.orders.parseText` (accepts OCR text and returns an order draft)
-- `sales.orders.parseImage` (accepts `imageBase64` + `mimeType`; OCR service integration pending)
-- `sales.orders.create`
+```bash
+curl -X POST http://localhost:8000/api/v1/orders/ocr \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <accessToken>' \
+  -d '{"imageUrls":["https://example.com/order.jpg"]}'
+```
 
 ## Modular monolith structure
 

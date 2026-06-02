@@ -24,6 +24,10 @@ export const customersRepository = {
     return CustomerModel.findOne({ customerId: id }).lean<Customer | null>();
   },
 
+  findByCustomerName(customerName: string) {
+    return CustomerModel.findOne({ customerName }).lean<Customer | null>();
+  },
+
   update(id: number, input: EntityPatch<Customer, 'customerId'>, session?: ClientSession) {
     return CustomerModel.findOneAndUpdate(
       { customerId: id },
