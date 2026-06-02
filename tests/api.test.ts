@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { extractProductImportRows } from '../src/modules/product/routes';
 import {
   initiateDb,
   disconnectPersistence,
@@ -226,6 +227,33 @@ describeIfMongo('ERP backend', () => {
         reason: expect.stringContaining('sellPrice:')
       })
     ]);
+  });
+
+  it('normalizes read-excel-file sheet data into product import rows', () => {
+    expect(
+      extractProductImportRows([
+        {
+          sheet: 'Sheet1',
+          data: [
+            ['รายการสินค้า', 'หน่วย', 'ราคาขาย', 'ราคาซื้อ'],
+            ['ทดสอบ', 'ชิ้น', 20, 10],
+            ['มะนาว', 'ลูก', 100, 50]
+          ]
+        }
+      ])
+    ).toEqual([
+      ['ทดสอบ', 'ชิ้น', 10, 20, undefined],
+      ['มะนาว', 'ลูก', 50, 100, undefined]
+    ]);
+  });
+
+  it('keeps supporting direct row arrays during product import normalization', () => {
+    expect(
+      extractProductImportRows([
+        ['productName', 'unit', 'sellPrice', 'defaultBuyPrice', 'status'],
+        ['Widget A', 'pcs', 150, 100, 'active']
+      ])
+    ).toEqual([['Widget A', 'pcs', 100, 150, 'active']]);
   });
 
   it('creates a paid credit when the order starts completed', async () => {

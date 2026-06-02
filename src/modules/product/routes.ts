@@ -6,6 +6,37 @@ import { productService } from './service';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+type ProductImportRow = Array<string | number | undefined>;
+type ProductImportSheet = {
+  sheet: string;
+  data: Array<Array<string | number | undefined>>;
+};
+
+const isSheetArray = (value: unknown): value is ProductImportSheet[] =>
+  Array.isArray(value) &&
+  value.every(
+    (entry) =>
+      entry !== null &&
+      typeof entry === 'object' &&
+      'sheet' in entry &&
+      'data' in entry &&
+      Array.isArray(entry.data)
+  );
+
+export const extractProductImportRows = (value: unknown): ProductImportRow[] => {
+  const rows = isSheetArray(value) ? value[0]?.data ?? [] : Array.isArray(value) ? value : [];
+  return rows
+    .slice(1)
+    .map((row) => {
+      if (!Array.isArray(row)) {
+        return [];
+      }
+
+      const [productName, unit, sellPrice, defaultBuyPrice, status] = row;
+      return [productName, unit, defaultBuyPrice, sellPrice, status] as ProductImportRow;
+    });
+};
+
 export const createProductRouter = () => {
   const router = Router();
 
@@ -25,7 +56,7 @@ export const createProductRouter = () => {
 
     const { default: readXlsxFile } = await import('read-excel-file/node');
     const rows = await readXlsxFile(req.file.buffer);
-    const dataRows = rows.slice(1) as unknown as Array<Array<string | number | undefined>>;
+    const dataRows = extractProductImportRows(rows);
     return res.status(201).json(await productService.importProducts(dataRows));
   });
 
