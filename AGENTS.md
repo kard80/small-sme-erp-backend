@@ -14,7 +14,7 @@ This is a Node.js + TypeScript modular monolith backend for a small SME ERP. Sou
 
 ## Coding Style & Naming Conventions
 
-Use strict TypeScript and keep modules focused by business responsibility. Follow the existing style: two-space indentation, single quotes, semicolons, named exports for app factories and helpers, and descriptive camelCase identifiers. Each domain module should keep validation in `schemas.ts`, persistence access in `repository.ts`, business rules in `service.ts`, REST handlers in `routes.ts`, and MCP tool registration in `mcp.ts` when needed. Do not mutate `db` directly from routes; go through the module service or repository. Keep cross-domain workflows explicit: `sales` owns orders, `credit` owns customer credits/balances, and `finance` owns payment transactions.
+Use strict TypeScript and keep modules focused by business responsibility. Follow the existing style: two-space indentation, single quotes, semicolons, named exports for app factories and helpers, and descriptive camelCase identifiers. Each domain module should keep validation in `schemas.ts`, persistence access in `repository.ts`, business rules in `service.ts`, REST handlers in `routes.ts`, and MCP tool registration in `mcp.ts` when needed. Do not mutate `db` directly from routes; go through the module service or repository. Repositories must explicitly whitelist the fields they persist or update in MongoDB and must not spread or pass through whole user-controlled payloads into `create`, `$set`, or other write operations. Keep cross-domain workflows explicit: `sales` owns orders, `credit` owns customer credits/balances, and `finance` owns payment transactions.
 
 ## Testing Guidelines
 
