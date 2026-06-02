@@ -1,38 +1,39 @@
-import { db, nextCustomerId } from '../../shared/store';
+import { ClientSession } from 'mongoose';
+import { CustomerModel, nextSequence } from '../../shared/persistence';
 import { Customer } from '../../shared/types';
 
 export const customersRepository = {
-  create(input: Omit<Customer, 'customerId'>) {
-    const customer = { customerId: nextCustomerId(), ...input };
-    db.customers.push(customer);
-    return customer;
+  async create(input: Omit<Customer, 'customerId'>, session?: ClientSession) {
+    const [customer] = await CustomerModel.create(
+      [
+        {
+          customerId: await nextSequence('customers', session),
+          ...input
+        }
+      ],
+      { session }
+    );
+    return customer.toObject();
   },
 
   list() {
-    return db.customers;
+    return CustomerModel.find().sort({ customerId: 1 }).lean<Customer[]>();
   },
 
   findById(id: number) {
-    return db.customers.find((item) => item.customerId === id);
+    return CustomerModel.findOne({ customerId: id }).lean<Customer | null>();
   },
 
-  update(id: number, input: Partial<Omit<Customer, 'customerId'>>) {
-    const customer = this.findById(id);
-    if (!customer) {
-      return undefined;
-    }
-
-    Object.assign(customer, input);
-    return customer;
+  update(id: number, input: Partial<Omit<Customer, 'customerId'>>, session?: ClientSession) {
+    return CustomerModel.findOneAndUpdate(
+      { customerId: id },
+      { $set: input },
+      { new: true, runValidators: true }
+    ).session(session ?? null).lean<Customer | null>();
   },
 
-  remove(id: number) {
-    const idx = db.customers.findIndex((item) => item.customerId === id);
-    if (idx < 0) {
-      return false;
-    }
-
-    db.customers.splice(idx, 1);
-    return true;
+  async remove(id: number, session?: ClientSession) {
+    const result = await CustomerModel.deleteOne({ customerId: id }).session(session ?? null);
+    return result.deletedCount > 0;
   }
 };

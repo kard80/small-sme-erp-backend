@@ -1,52 +1,53 @@
-import { db, nextCreditId } from '../../shared/store';
+import { ClientSession } from 'mongoose';
+import { CustomerCreditModel, nextSequence } from '../../shared/persistence';
 import { CustomerCredit } from '../../shared/types';
 
 export const creditRepository = {
-  create(input: Omit<CustomerCredit, 'id'>) {
-    const credit = { id: nextCreditId(), ...input };
-    db.customerCredits.push(credit);
-    return credit;
+  async create(input: Omit<CustomerCredit, 'id'>, session?: ClientSession) {
+    const [credit] = await CustomerCreditModel.create(
+      [
+        {
+          id: await nextSequence('customerCredits', session),
+          ...input
+        }
+      ],
+      { session }
+    );
+    return credit.toObject();
   },
 
   list() {
-    return db.customerCredits;
+    return CustomerCreditModel.find().sort({ id: 1 }).lean<CustomerCredit[]>();
   },
 
-  findById(id: number) {
-    return db.customerCredits.find((item) => item.id === id);
+  findById(id: number, session?: ClientSession) {
+    return CustomerCreditModel.findOne({ id }).session(session ?? null).lean<CustomerCredit | null>();
   },
 
-  findByOrderId(orderId: number) {
-    return db.customerCredits.find((item) => item.orderId === orderId);
+  findByOrderId(orderId: number, session?: ClientSession) {
+    return CustomerCreditModel.findOne({ orderId }).session(session ?? null).lean<CustomerCredit | null>();
   },
 
   listByOrderId(orderId: number) {
-    return db.customerCredits.filter((item) => item.orderId === orderId);
+    return CustomerCreditModel.find({ orderId }).sort({ id: 1 }).lean<CustomerCredit[]>();
   },
 
-  update(id: number, input: Partial<Omit<CustomerCredit, 'id'>>) {
-    const credit = this.findById(id);
-    if (!credit) {
-      return undefined;
-    }
-
-    Object.assign(credit, input);
-    return credit;
+  update(id: number, input: Partial<Omit<CustomerCredit, 'id'>>, session?: ClientSession) {
+    return CustomerCreditModel.findOneAndUpdate({ id }, { $set: input }, { new: true, runValidators: true }).lean<
+      CustomerCredit | null
+    >().session(session ?? null);
   },
 
-  remove(id: number) {
-    const idx = db.customerCredits.findIndex((item) => item.id === id);
-    if (idx < 0) {
-      return undefined;
-    }
-
-    const [removed] = db.customerCredits.splice(idx, 1);
-    return removed;
+  remove(id: number, session?: ClientSession) {
+    return CustomerCreditModel.findOneAndDelete({ id }).session(session ?? null).lean<CustomerCredit | null>();
   },
 
-  removeByOrderId(orderId: number) {
-    const removed = this.listByOrderId(orderId);
-    db.customerCredits = db.customerCredits.filter((item) => item.orderId !== orderId);
+  async removeByOrderId(orderId: number, session?: ClientSession) {
+    const removed = await CustomerCreditModel.find({ orderId })
+      .session(session ?? null)
+      .sort({ id: 1 })
+      .lean<CustomerCredit[]>();
+    await CustomerCreditModel.deleteMany({ orderId }).session(session ?? null);
     return removed;
   }
 };

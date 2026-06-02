@@ -1,43 +1,45 @@
-import { db, nextFinancialId } from '../../shared/store';
+import { ClientSession } from 'mongoose';
+import {
+  PaymentTransactionModel,
+  nextSequence
+} from '../../shared/persistence';
 import { PaymentTransaction } from '../../shared/types';
 
 export const financeRepository = {
-  create(input: Omit<PaymentTransaction, 'id'>) {
-    const payment = { id: nextFinancialId(), ...input };
-    db.financials.push(payment);
-    return payment;
+  async create(input: Omit<PaymentTransaction, 'id'>, session?: ClientSession) {
+    const [payment] = await PaymentTransactionModel.create(
+      [
+        {
+          id: await nextSequence('financials', session),
+          ...input
+        }
+      ],
+      { session }
+    );
+    return payment.toObject();
   },
 
   list() {
-    return db.financials;
+    return PaymentTransactionModel.find().sort({ id: 1 }).lean<PaymentTransaction[]>();
   },
 
   findById(id: number) {
-    return db.financials.find((item) => item.id === id);
+    return PaymentTransactionModel.findOne({ id }).lean<PaymentTransaction | null>();
   },
 
-  update(id: number, input: Omit<PaymentTransaction, 'id'>) {
-    const idx = db.financials.findIndex((item) => item.id === id);
-    if (idx < 0) {
-      return undefined;
-    }
-
-    const updated = { id, ...input };
-    db.financials[idx] = updated;
-    return updated;
+  update(id: number, input: Omit<PaymentTransaction, 'id'>, session?: ClientSession) {
+    return PaymentTransactionModel.findOneAndUpdate(
+      { id },
+      { $set: input },
+      { new: true, runValidators: true }
+    ).session(session ?? null).lean<PaymentTransaction | null>();
   },
 
-  remove(id: number) {
-    const idx = db.financials.findIndex((item) => item.id === id);
-    if (idx < 0) {
-      return undefined;
-    }
-
-    const [removed] = db.financials.splice(idx, 1);
-    return removed;
+  remove(id: number, session?: ClientSession) {
+    return PaymentTransactionModel.findOneAndDelete({ id }).session(session ?? null).lean<PaymentTransaction | null>();
   },
 
-  removeByCreditId(customerCreditId: number) {
-    db.financials = db.financials.filter((tx) => tx.customerCreditId !== customerCreditId);
+  async removeByCreditId(customerCreditId: number, session?: ClientSession) {
+    await PaymentTransactionModel.deleteMany({ customerCreditId }).session(session ?? null);
   }
 };

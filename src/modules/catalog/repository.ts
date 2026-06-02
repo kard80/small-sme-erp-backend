@@ -1,38 +1,42 @@
-import { db, nextProductId, paginate } from '../../shared/store';
+import { ClientSession } from 'mongoose';
+import { ProductModel, nextSequence } from '../../shared/persistence';
 import { Product } from '../../shared/types';
 
 export const catalogRepository = {
-  create(input: Omit<Product, 'id'>) {
-    const product = { id: nextProductId(), ...input };
-    db.products.push(product);
-    return product;
+  async create(input: Omit<Product, 'id'>, session?: ClientSession) {
+    const [product] = await ProductModel.create(
+      [
+        {
+          id: await nextSequence('products', session),
+          ...input
+        }
+      ],
+      { session }
+    );
+    return product.toObject();
   },
 
-  list(page: number, pageSize: number) {
-    return paginate(db.products, page, pageSize);
+  async list(page: number, pageSize: number) {
+    const [data, total] = await Promise.all([
+      ProductModel.find().sort({ id: 1 }).skip((page - 1) * pageSize).limit(pageSize).lean<Product[]>(),
+      ProductModel.countDocuments()
+    ]);
+
+    return { data, page, pageSize, total };
   },
 
   findById(id: number) {
-    return db.products.find((item) => item.id === id);
+    return ProductModel.findOne({ id }).lean<Product | null>();
   },
 
-  update(id: number, input: Partial<Omit<Product, 'id'>>) {
-    const product = this.findById(id);
-    if (!product) {
-      return undefined;
-    }
-
-    Object.assign(product, input);
-    return product;
+  update(id: number, input: Partial<Omit<Product, 'id'>>, session?: ClientSession) {
+    return ProductModel.findOneAndUpdate({ id }, { $set: input }, { new: true, runValidators: true }).lean<
+      Product | null
+    >().session(session ?? null);
   },
 
-  remove(id: number) {
-    const idx = db.products.findIndex((item) => item.id === id);
-    if (idx < 0) {
-      return false;
-    }
-
-    db.products.splice(idx, 1);
-    return true;
+  async remove(id: number, session?: ClientSession) {
+    const result = await ProductModel.deleteOne({ id }).session(session ?? null);
+    return result.deletedCount > 0;
   }
 };

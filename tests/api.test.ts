@@ -1,9 +1,9 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { initiateDb, disconnectPersistence, CustomerCreditModel, OrderModel, PaymentTransactionModel } from '../src/shared/persistence';
 import { createRestApp } from '../src/restApp';
-import { db, resetInMemoryStore } from '../src/store';
 
-const resetDb = () => resetInMemoryStore();
+const describeIfMongo = process.env.MONGODB_URI ? describe : describe.skip;
 
 const loginAsAdmin = async (app: ReturnType<typeof createRestApp>) => {
   const response = await request(app).post('/api/auth/login').send({
@@ -20,9 +20,21 @@ const loginAsAdmin = async (app: ReturnType<typeof createRestApp>) => {
   };
 };
 
-describe('ERP backend', () => {
-  beforeEach(() => {
-    resetDb();
+describeIfMongo('ERP backend', () => {
+  beforeAll(async () => {
+    await initiateDb();
+  });
+
+  beforeEach(async () => {
+    await Promise.all([
+      PaymentTransactionModel.deleteMany({}),
+      CustomerCreditModel.deleteMany({}),
+      OrderModel.deleteMany({})
+    ]);
+  });
+
+  afterAll(async () => {
+    await disconnectPersistence();
   });
 
   it('creates order via REST and auto-creates customer credit', async () => {
@@ -79,8 +91,9 @@ describe('ERP backend', () => {
       });
 
     expect(partial.status).toBe(201);
-    expect(db.customerCredits[0].status).toBe('pending');
-    expect(db.customerCredits[0].paidAmount).toBe(50);
+    const pendingCredit = await CustomerCreditModel.findOne({ id: creditId }).lean();
+    expect(pendingCredit?.status).toBe('pending');
+    expect(pendingCredit?.paidAmount).toBe(50);
 
     const complete = await request(app)
       .post('/api/finance/payments')
@@ -92,8 +105,12 @@ describe('ERP backend', () => {
       });
 
     expect(complete.status).toBe(201);
-    expect(db.customerCredits[0].status).toBe('paid');
-    expect(db.orders[0].status).toBe('completed');
+    const [paidCredit, completedOrder] = await Promise.all([
+      CustomerCreditModel.findOne({ id: creditId }).lean(),
+      OrderModel.findOne({ id: created.body.order.id }).lean()
+    ]);
+    expect(paidCredit?.status).toBe('paid');
+    expect(completedOrder?.status).toBe('completed');
   });
 
   it('authenticates REST requests with access and refresh tokens', async () => {
@@ -175,9 +192,14 @@ describe('ERP backend', () => {
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(removed.status).toBe(204);
-    expect(db.orders).toHaveLength(0);
-    expect(db.customerCredits).toHaveLength(0);
-    expect(db.financials).toHaveLength(0);
+    const [ordersCount, creditsCount, paymentsCount] = await Promise.all([
+      OrderModel.countDocuments(),
+      CustomerCreditModel.countDocuments(),
+      PaymentTransactionModel.countDocuments()
+    ]);
+    expect(ordersCount).toBe(0);
+    expect(creditsCount).toBe(0);
+    expect(paymentsCount).toBe(0);
   });
 
   it('rejects payments against cancelled customer credit', async () => {

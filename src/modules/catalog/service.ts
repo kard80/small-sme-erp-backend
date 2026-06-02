@@ -18,7 +18,7 @@ export const catalogService = {
     return catalogRepository.remove(id);
   },
 
-  importProducts(rows: Array<Array<string | number | undefined>>) {
+  async importProducts(rows: Array<Array<string | number | undefined>>) {
     const created = [];
     for (const row of rows) {
       const [productName, unit, defaultBuyPrice, defaultSellPrice] = row;
@@ -27,7 +27,7 @@ export const catalogService = {
         continue;
       }
 
-      created.push(catalogRepository.create(parsed.data));
+      created.push(await catalogRepository.create(parsed.data));
     }
 
     return {

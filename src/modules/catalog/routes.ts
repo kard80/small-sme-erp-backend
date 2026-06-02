@@ -9,13 +9,13 @@ const upload = multer({ storage: multer.memoryStorage() });
 export const createCatalogRouter = () => {
   const router = Router();
 
-  router.post('/products', (req, res) => {
+  router.post('/products', async (req, res) => {
     const input = productSchema.safeParse(req.body);
     if (!input.success) {
       return res.status(400).json({ error: input.error.flatten() });
     }
 
-    return res.status(201).json(catalogService.createProduct(input.data));
+    return res.status(201).json(await catalogService.createProduct(input.data));
   });
 
   router.post('/products/import-excel', upload.single('file'), async (req, res) => {
@@ -26,19 +26,19 @@ export const createCatalogRouter = () => {
     const { default: readXlsxFile } = await import('read-excel-file/node');
     const rows = await readXlsxFile(req.file.buffer);
     const dataRows = rows.slice(1) as unknown as Array<Array<string | number | undefined>>;
-    return res.status(201).json(catalogService.importProducts(dataRows));
+    return res.status(201).json(await catalogService.importProducts(dataRows));
   });
 
-  router.get('/products', (req, res) => {
+  router.get('/products', async (req, res) => {
     const parsed = paginationSchema.safeParse(req.query);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    return res.json(catalogService.listProducts(parsed.data.page, parsed.data.pageSize));
+    return res.json(await catalogService.listProducts(parsed.data.page, parsed.data.pageSize));
   });
 
-  router.patch('/products/:id', (req, res) => {
+  router.patch('/products/:id', async (req, res) => {
     const id = parseIdParam(req, res, 'product');
     const input = productUpdateSchema.safeParse(req.body);
     if (id === undefined) {
@@ -48,7 +48,7 @@ export const createCatalogRouter = () => {
       return res.status(400).json({ error: 'Invalid request' });
     }
 
-    const product = catalogService.updateProduct(id, input.data);
+    const product = await catalogService.updateProduct(id, input.data);
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -56,13 +56,13 @@ export const createCatalogRouter = () => {
     return res.json(product);
   });
 
-  router.delete('/products/:id', (req, res) => {
+  router.delete('/products/:id', async (req, res) => {
     const id = parseIdParam(req, res, 'product');
     if (id === undefined) {
       return;
     }
 
-    if (!catalogService.removeProduct(id)) {
+    if (!(await catalogService.removeProduct(id))) {
       return res.status(404).json({ error: 'Product not found' });
     }
 

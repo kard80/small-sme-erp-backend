@@ -17,13 +17,18 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "bugs": {
     "url": "https://github.com/kard80/small-sme-erp-backend/issues"
   },
   "homepage": "https://github.com/kard80/small-sme-erp-backend#readme",
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.6.3",
     "multer": "^2.1.1",
     "read-excel-file": "^9.0.10",
     "zod": "^4.4.3"

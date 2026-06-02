@@ -1,38 +1,41 @@
-import { db, nextOrderId, paginate } from '../../shared/store';
+import { ClientSession } from 'mongoose';
+import { OrderModel, nextSequence } from '../../shared/persistence';
 import { CreateOrderInput, Order } from '../../shared/types';
 
 export const salesRepository = {
-  create(input: CreateOrderInput) {
-    const order = { id: nextOrderId(), ...input };
-    db.orders.push(order);
-    return order;
+  async create(input: CreateOrderInput, session?: ClientSession) {
+    const [order] = await OrderModel.create(
+      [
+        {
+          id: await nextSequence('orders', session),
+          ...input
+        }
+      ],
+      { session }
+    );
+    return order.toObject();
   },
 
-  list(page: number, pageSize: number) {
-    return paginate(db.orders, page, pageSize);
+  async list(page: number, pageSize: number) {
+    const [data, total] = await Promise.all([
+      OrderModel.find().sort({ id: 1 }).skip((page - 1) * pageSize).limit(pageSize).lean<Order[]>(),
+      OrderModel.countDocuments()
+    ]);
+
+    return { data, page, pageSize, total };
   },
 
-  findById(id: number) {
-    return db.orders.find((item) => item.id === id);
+  findById(id: number, session?: ClientSession) {
+    return OrderModel.findOne({ id }).session(session ?? null).lean<Order | null>();
   },
 
-  update(id: number, input: Partial<Omit<Order, 'id'>>) {
-    const order = this.findById(id);
-    if (!order) {
-      return undefined;
-    }
-
-    Object.assign(order, input);
-    return order;
+  update(id: number, input: Partial<Omit<Order, 'id'>>, session?: ClientSession) {
+    return OrderModel.findOneAndUpdate({ id }, { $set: input }, { new: true, runValidators: true }).lean<
+      Order | null
+    >().session(session ?? null);
   },
 
-  remove(id: number) {
-    const idx = db.orders.findIndex((item) => item.id === id);
-    if (idx < 0) {
-      return undefined;
-    }
-
-    const [removed] = db.orders.splice(idx, 1);
-    return removed;
+  remove(id: number, session?: ClientSession) {
+    return OrderModel.findOneAndDelete({ id }).session(session ?? null).lean<Order | null>();
   }
 };

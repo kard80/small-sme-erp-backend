@@ -1,3 +1,6 @@
+import { ClientSession } from 'mongoose';
+import { runInTransaction } from '../../shared/persistence';
+import { financeRepository } from '../finance/repository';
 import { CreditStatus, CustomerCredit, OrderStatus } from '../../shared/types';
 import { creditRepository } from './repository';
 
@@ -22,14 +25,19 @@ export const creditService = {
     return creditRepository.create(input);
   },
 
-  createCreditForOrder(order: { id: number; customerId: number; sellPrice: number; status: OrderStatus }) {
+  createCreditForOrder(order: {
+    id: number;
+    customerId: number;
+    sellPrice: number;
+    status: OrderStatus;
+  }, session?: ClientSession) {
     return creditRepository.create({
       orderId: order.id,
       customerId: order.customerId,
       totalAmount: order.sellPrice,
       paidAmount: 0,
       status: order.status === 'cancelled' ? 'cancelled' : 'pending'
-    });
+    }, session);
   },
 
   listCustomerCredits() {
@@ -44,37 +52,42 @@ export const creditService = {
     return creditRepository.findByOrderId(orderId);
   },
 
-  updateCreditFromOrder(orderId: number, input: { sellPrice?: number; customerId?: number; status?: OrderStatus }) {
-    const credit = creditRepository.findByOrderId(orderId);
+  async updateCreditFromOrder(
+    orderId: number,
+    input: { sellPrice?: number; customerId?: number; status?: OrderStatus },
+    session?: ClientSession
+  ) {
+    const credit = await creditRepository.findByOrderId(orderId);
     if (!credit) {
       return undefined;
     }
 
-    if (typeof input.sellPrice === 'number') {
-      credit.totalAmount = input.sellPrice;
+    return creditRepository.update(credit.id, {
+      totalAmount: typeof input.sellPrice === 'number' ? input.sellPrice : credit.totalAmount,
+      customerId: typeof input.customerId === 'number' ? input.customerId : credit.customerId,
+      status: input.status ? (input.status === 'completed' ? 'paid' : input.status) : credit.status
+    }, session);
+  },
+
+  async updateCustomerCredit(id: number, input: Partial<Omit<CustomerCredit, 'id'>>, session?: ClientSession) {
+    const existing = await creditRepository.findById(id);
+    if (!existing) {
+      return undefined;
     }
-    if (typeof input.customerId === 'number') {
-      credit.customerId = input.customerId;
-    }
-    if (input.status) {
-      credit.status = input.status === 'completed' ? 'paid' : input.status;
+
+    const credit = await creditRepository.update(id, {
+      ...input,
+      status: normalizeCreditStatus({ ...existing, ...input, id: existing.id })
+    }, session);
+    if (!credit) {
+      return undefined;
     }
 
     return credit;
   },
 
-  updateCustomerCredit(id: number, input: Partial<Omit<CustomerCredit, 'id'>>) {
-    const credit = creditRepository.update(id, input);
-    if (!credit) {
-      return undefined;
-    }
-
-    credit.status = normalizeCreditStatus(credit);
-    return credit;
-  },
-
-  adjustPaidAmount(id: number, delta: number) {
-    const credit = creditRepository.findById(id);
+  async adjustPaidAmount(id: number, delta: number, session?: ClientSession) {
+    const credit = await creditRepository.findById(id);
     if (!credit) {
       throw new Error('Customer credit not found');
     }
@@ -83,19 +96,28 @@ export const creditService = {
       throw new Error('Cannot pay cancelled customer credit');
     }
 
-    credit.paidAmount += delta;
-    if (credit.paidAmount < 0) {
-      credit.paidAmount = 0;
-    }
-    credit.status = normalizeCreditStatus(credit);
-    return credit;
+    const paidAmount = Math.max(0, credit.paidAmount + delta);
+    return creditRepository.update(id, {
+      paidAmount,
+      status: normalizeCreditStatus({ ...credit, paidAmount })
+    }, session);
   },
 
-  removeCustomerCredit(id: number) {
-    return creditRepository.remove(id);
+  removeCustomerCredit(id: number, session?: ClientSession) {
+    const run = async (activeSession?: ClientSession) => {
+      const removed = await creditRepository.remove(id, activeSession);
+      if (!removed) {
+        return undefined;
+      }
+
+      await financeRepository.removeByCreditId(removed.id, activeSession);
+      return removed;
+    };
+
+    return session ? run(session) : runInTransaction(run);
   },
 
-  removeCreditsForOrder(orderId: number) {
-    return creditRepository.removeByOrderId(orderId);
+  removeCreditsForOrder(orderId: number, session?: ClientSession) {
+    return creditRepository.removeByOrderId(orderId, session);
   }
 };

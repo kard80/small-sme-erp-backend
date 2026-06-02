@@ -1,29 +1,33 @@
+import { ClientSession } from 'mongoose';
 import { creditService } from '../credit/service';
 import { salesService } from '../sales/service';
+import { runInTransaction } from '../../shared/persistence';
 import { PaymentTransaction } from '../../shared/types';
 import { financeRepository } from './repository';
 
-const syncOrderFromCredit = (customerCreditId: number) => {
-  const credit = creditService.getCustomerCredit(customerCreditId);
+const syncOrderFromCredit = async (customerCreditId: number, session?: ClientSession) => {
+  const credit = await creditService.getCustomerCredit(customerCreditId);
   if (credit) {
-    salesService.updateOrderStatusFromCredit(credit.orderId, credit.status);
+    await salesService.updateOrderStatusFromCredit(credit.orderId, credit.status, session);
   }
 };
 
 export const financeService = {
   applyPayment(input: Omit<PaymentTransaction, 'id'>) {
-    const credit = creditService.getCustomerCredit(input.customerCreditId);
-    if (!credit) {
-      throw new Error('Customer credit not found');
-    }
-    if (credit.status === 'cancelled') {
-      throw new Error('Cannot pay cancelled customer credit');
-    }
+    return runInTransaction(async (session) => {
+      const credit = await creditService.getCustomerCredit(input.customerCreditId);
+      if (!credit) {
+        throw new Error('Customer credit not found');
+      }
+      if (credit.status === 'cancelled') {
+        throw new Error('Cannot pay cancelled customer credit');
+      }
 
-    const payment = financeRepository.create(input);
-    creditService.adjustPaidAmount(payment.customerCreditId, payment.amount);
-    syncOrderFromCredit(payment.customerCreditId);
-    return payment;
+      const payment = await financeRepository.create(input, session);
+      await creditService.adjustPaidAmount(payment.customerCreditId, payment.amount, session);
+      await syncOrderFromCredit(payment.customerCreditId, session);
+      return payment;
+    });
   },
 
   listPayments() {
@@ -35,44 +39,48 @@ export const financeService = {
   },
 
   replacePayment(id: number, nextInput: Omit<PaymentTransaction, 'id'>) {
-    const previous = financeRepository.findById(id);
-    if (!previous) {
-      throw new Error('Financial transaction not found');
-    }
+    return runInTransaction(async (session) => {
+      const previous = await financeRepository.findById(id);
+      if (!previous) {
+        throw new Error('Financial transaction not found');
+      }
 
-    const nextCredit = creditService.getCustomerCredit(nextInput.customerCreditId);
-    if (!nextCredit) {
-      throw new Error('Customer credit not found');
-    }
-    if (nextCredit.status === 'cancelled') {
-      throw new Error('Cannot pay cancelled customer credit');
-    }
+      const nextCredit = await creditService.getCustomerCredit(nextInput.customerCreditId);
+      if (!nextCredit) {
+        throw new Error('Customer credit not found');
+      }
+      if (nextCredit.status === 'cancelled') {
+        throw new Error('Cannot pay cancelled customer credit');
+      }
 
-    creditService.adjustPaidAmount(previous.customerCreditId, -previous.amount);
-    syncOrderFromCredit(previous.customerCreditId);
+      await creditService.adjustPaidAmount(previous.customerCreditId, -previous.amount, session);
+      await syncOrderFromCredit(previous.customerCreditId, session);
 
-    const updated = financeRepository.update(id, nextInput);
-    if (!updated) {
-      throw new Error('Financial transaction not found');
-    }
+      const updated = await financeRepository.update(id, nextInput, session);
+      if (!updated) {
+        throw new Error('Financial transaction not found');
+      }
 
-    creditService.adjustPaidAmount(updated.customerCreditId, updated.amount);
-    syncOrderFromCredit(updated.customerCreditId);
-    return updated;
+      await creditService.adjustPaidAmount(updated.customerCreditId, updated.amount, session);
+      await syncOrderFromCredit(updated.customerCreditId, session);
+      return updated;
+    });
   },
 
   removePayment(id: number) {
-    const removed = financeRepository.remove(id);
-    if (!removed) {
-      return false;
-    }
+    return runInTransaction(async (session) => {
+      const removed = await financeRepository.remove(id, session);
+      if (!removed) {
+        return false;
+      }
 
-    creditService.adjustPaidAmount(removed.customerCreditId, -removed.amount);
-    syncOrderFromCredit(removed.customerCreditId);
-    return true;
+      await creditService.adjustPaidAmount(removed.customerCreditId, -removed.amount, session);
+      await syncOrderFromCredit(removed.customerCreditId, session);
+      return true;
+    });
   },
 
-  removePaymentsForCredit(customerCreditId: number) {
-    financeRepository.removeByCreditId(customerCreditId);
+  removePaymentsForCredit(customerCreditId: number, session?: ClientSession) {
+    return financeRepository.removeByCreditId(customerCreditId, session);
   }
 };

@@ -1,9 +1,22 @@
 import { createRestApp } from './restApp';
+import { loadExternalEnv } from './shared/env';
+import { initiateDb } from './shared/persistence';
 
-const restPort = Number(process.env.REST_PORT || 3000);
+const start = async () => {
+  require('dotenv').config()
+  loadExternalEnv();
 
-const restApp = createRestApp();
+  const restPort = Number(process.env.REST_PORT || 3000);
+  await initiateDb();
 
-restApp.listen(restPort, () => {
-  console.log(`REST API server running on port ${restPort}`);
+  const restApp = createRestApp();
+
+  restApp.listen(restPort, () => {
+    console.log(`REST API server running on port ${restPort} using mongodb persistence`);
+  });
+};
+
+start().catch((error) => {
+  console.error('Failed to start server', error);
+  process.exit(1);
 });

@@ -1,4 +1,5 @@
 import express from 'express';
+import { assertDbReady } from '../shared/persistence';
 import { requireAuth } from '../modules/auth/middleware';
 import { createAuthRouter } from '../modules/auth/routes';
 import { createCatalogRouter } from '../modules/catalog/routes';
@@ -8,6 +9,8 @@ import { createFinanceRouter } from '../modules/finance/routes';
 import { createSalesRouter } from '../modules/sales/routes';
 
 export const createRestApp = () => {
+  assertDbReady();
+
   const app = express();
   app.use(express.json());
 

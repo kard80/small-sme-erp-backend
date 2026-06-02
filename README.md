@@ -5,12 +5,59 @@ Node.js + TypeScript modular monolith backend for a small SME ERP with **two ser
 - REST API server (default `3000`)
 - MCP server (default `3001`)
 
+## Persistence
+
+This service now supports a strict MongoDB-backed persistence layer using `mongoose`.
+
+- Package choice: `mongoose`
+- Why: it fits MongoDB naturally, enforces runtime schema strictness, and preserves the existing numeric public IDs without forcing Prisma-style `ObjectId` APIs through the whole service.
+- Strictness: all Mongo schemas run with `strict: 'throw'`, enum validation, required fields, and validator-backed updates.
+
+MongoDB is required. Set:
+
+```bash
+export MONGODB_URI='mongodb://127.0.0.1:27017/sme_erp'
+```
+
+Optional:
+
+```bash
+export MONGODB_SERVER_SELECTION_TIMEOUT_MS=5000
+```
+
 ## Run
 
 ```bash
+nvm use
 npm install
 npm run dev
 ```
+
+This project targets Node.js 24.
+
+```bash
+MONGODB_URI='mongodb://127.0.0.1:27017/sme_erp' npm run dev
+```
+
+If you keep secrets outside the repo, you can load an external env file manually:
+
+```bash
+ENV_FILE_PATH='/absolute/path/to/.env' npm run dev
+```
+
+or
+
+```bash
+npm run dev -- --env-file=/absolute/path/to/.env
+```
+
+The external env loader only fills variables that are not already set in the shell.
+
+## Tests
+
+The test suite is Mongo-backed. Set `MONGODB_URI` before running `npm test`.
+
+If `MONGODB_URI` is not set, the suite skips instead of falling back to the removed in-memory store.
 
 ## REST API
 
@@ -71,4 +118,4 @@ Business modules live under `src/modules/`:
 - `credit`
 - `finance`
 
-Application composition lives in `src/app/`, while shared in-memory persistence and common helpers live in `src/shared/`.
+Application composition lives in `src/app/`, while shared persistence and common helpers live in `src/shared/`.

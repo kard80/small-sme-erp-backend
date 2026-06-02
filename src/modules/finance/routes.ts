@@ -6,30 +6,30 @@ import { financeService } from './service';
 export const createFinanceRouter = () => {
   const router = Router();
 
-  router.post('/payments', (req, res) => {
+  router.post('/payments', async (req, res) => {
     const input = paymentSchema.safeParse(req.body);
     if (!input.success) {
       return res.status(400).json({ error: input.error.flatten() });
     }
 
     try {
-      return res.status(201).json(financeService.applyPayment(input.data));
+      return res.status(201).json(await financeService.applyPayment(input.data));
     } catch (error) {
       return res.status(400).json({ error: errorMessage(error) });
     }
   });
 
-  router.get('/payments', (_req, res) => {
-    return res.json(financeService.listPayments());
+  router.get('/payments', async (_req, res) => {
+    return res.json(await financeService.listPayments());
   });
 
-  router.get('/payments/:id', (req, res) => {
+  router.get('/payments/:id', async (req, res) => {
     const id = parseIdParam(req, res, 'payment');
     if (id === undefined) {
       return;
     }
 
-    const payment = financeService.getPayment(id);
+    const payment = await financeService.getPayment(id);
     if (!payment) {
       return res.status(404).json({ error: 'Financial transaction not found' });
     }
@@ -37,7 +37,7 @@ export const createFinanceRouter = () => {
     return res.json(payment);
   });
 
-  router.patch('/payments/:id', (req, res) => {
+  router.patch('/payments/:id', async (req, res) => {
     const id = parseIdParam(req, res, 'payment');
     const input = paymentSchema.safeParse(req.body);
     if (id === undefined) {
@@ -48,19 +48,19 @@ export const createFinanceRouter = () => {
     }
 
     try {
-      return res.json(financeService.replacePayment(id, input.data));
+      return res.json(await financeService.replacePayment(id, input.data));
     } catch (error) {
       return res.status(400).json({ error: errorMessage(error) });
     }
   });
 
-  router.delete('/payments/:id', (req, res) => {
+  router.delete('/payments/:id', async (req, res) => {
     const id = parseIdParam(req, res, 'payment');
     if (id === undefined) {
       return;
     }
 
-    if (!financeService.removePayment(id)) {
+    if (!(await financeService.removePayment(id))) {
       return res.status(404).json({ error: 'Financial transaction not found' });
     }
 
