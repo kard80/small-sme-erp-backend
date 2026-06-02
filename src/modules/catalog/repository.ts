@@ -1,9 +1,9 @@
 import { ClientSession } from 'mongoose';
 import { ProductModel, nextSequence } from '../../shared/persistence';
-import { Product } from '../../shared/types';
+import { EntityPatch, NewEntity, Product } from '../../shared/types';
 
-export const catalogRepository = {
-  async create(input: Omit<Product, 'id'>, session?: ClientSession) {
+export const productRepository = {
+  async create(input: NewEntity<Product, 'id'>, session?: ClientSession) {
     const [product] = await ProductModel.create(
       [
         {
@@ -29,7 +29,7 @@ export const catalogRepository = {
     return ProductModel.findOne({ id }).lean<Product | null>();
   },
 
-  update(id: number, input: Partial<Omit<Product, 'id'>>, session?: ClientSession) {
+  update(id: number, input: EntityPatch<Product, 'id'>, session?: ClientSession) {
     return ProductModel.findOneAndUpdate({ id }, { $set: input }, { new: true, runValidators: true }).lean<
       Product | null
     >().session(session ?? null);

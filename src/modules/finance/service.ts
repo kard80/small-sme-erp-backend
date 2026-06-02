@@ -1,19 +1,19 @@
 import { ClientSession } from 'mongoose';
 import { creditService } from '../credit/service';
-import { salesService } from '../sales/service';
+import { orderService } from '../sales/service';
 import { runInTransaction } from '../../shared/persistence';
-import { PaymentTransaction } from '../../shared/types';
+import { NewEntity, PaymentTransaction } from '../../shared/types';
 import { financeRepository } from './repository';
 
 const syncOrderFromCredit = async (customerCreditId: number, session?: ClientSession) => {
   const credit = await creditService.getCustomerCredit(customerCreditId, session);
   if (credit) {
-    await salesService.updateOrderStatusFromCredit(credit.orderId, credit.status, session);
+    await orderService.updateOrderStatusFromCredit(credit.orderId, credit.status, session);
   }
 };
 
 export const financeService = {
-  applyPayment(input: Omit<PaymentTransaction, 'id'>) {
+  applyPayment(input: NewEntity<PaymentTransaction, 'id'>) {
     return runInTransaction(async (session) => {
       const credit = await creditService.getCustomerCredit(input.customerCreditId, session);
       if (!credit) {
@@ -38,7 +38,7 @@ export const financeService = {
     return financeRepository.findById(id);
   },
 
-  replacePayment(id: number, nextInput: Omit<PaymentTransaction, 'id'>) {
+  replacePayment(id: number, nextInput: NewEntity<PaymentTransaction, 'id'>) {
     return runInTransaction(async (session) => {
       const previous = await financeRepository.findById(id, session);
       if (!previous) {

@@ -3,10 +3,10 @@ import {
   PaymentTransactionModel,
   nextSequence
 } from '../../shared/persistence';
-import { PaymentTransaction } from '../../shared/types';
+import { NewEntity, PaymentTransaction } from '../../shared/types';
 
 export const financeRepository = {
-  async create(input: Omit<PaymentTransaction, 'id'>, session?: ClientSession) {
+  async create(input: NewEntity<PaymentTransaction, 'id'>, session?: ClientSession) {
     const [payment] = await PaymentTransactionModel.create(
       [
         {
@@ -27,7 +27,7 @@ export const financeRepository = {
     return PaymentTransactionModel.findOne({ id }).session(session ?? null).lean<PaymentTransaction | null>();
   },
 
-  update(id: number, input: Omit<PaymentTransaction, 'id'>, session?: ClientSession) {
+  update(id: number, input: NewEntity<PaymentTransaction, 'id'>, session?: ClientSession) {
     return PaymentTransactionModel.findOneAndUpdate(
       { id },
       { $set: input },

@@ -1,5 +1,5 @@
 import mongoose, { ClientSession, Schema, model, models } from 'mongoose';
-import { CreditStatus, Customer, CustomerCredit, Order, OrderStatus, PaymentTransaction, Product } from './types';
+import { CreditStatus, Customer, CustomerCredit, Order, OrderStatus, PaymentTransaction, Product, ProductStatus } from './types';
 
 mongoose.set('strictQuery', true);
 
@@ -9,19 +9,24 @@ const baseSchemaOptions = {
   minimize: false as const
 };
 
+const productStatusValues: ProductStatus[] = ['active', 'inactive'];
+
 const productSchema = new Schema<Product>(
   {
+    _id: { type: Schema.Types.ObjectId, auto: true },
     id: { type: Number, required: true, unique: true },
     productName: { type: String, required: true, trim: true },
     unit: { type: String, required: true, trim: true },
-    defaultBuyPrice: { type: Number, required: true, min: 0 },
-    defaultSellPrice: { type: Number, required: true, min: 0 }
+    defaultBuyPrice: { type: Number, required: false, min: 0 },
+    sellPrice: { type: Number, required: true, min: 0 },
+    status: { type: String, required: true, enum: productStatusValues, default: 'active' }
   },
   baseSchemaOptions
 );
 
 const customerSchema = new Schema<Customer>(
   {
+    _id: { type: Schema.Types.ObjectId, auto: true },
     customerId: { type: Number, required: true, unique: true },
     customerName: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
@@ -35,6 +40,7 @@ const creditStatusValues: CreditStatus[] = ['pending', 'paid', 'cancelled'];
 
 const orderSchema = new Schema<Order>(
   {
+    _id: { type: Schema.Types.ObjectId, auto: true },
     id: { type: Number, required: true, unique: true },
     productId: { type: Number, required: true, index: true },
     productName: { type: String, required: true, trim: true },
@@ -50,6 +56,7 @@ const orderSchema = new Schema<Order>(
 
 const customerCreditSchema = new Schema<CustomerCredit>(
   {
+    _id: { type: Schema.Types.ObjectId, auto: true },
     id: { type: Number, required: true, unique: true },
     orderId: { type: Number, required: true, index: true },
     customerId: { type: Number, required: true, index: true },
@@ -62,6 +69,7 @@ const customerCreditSchema = new Schema<CustomerCredit>(
 
 const paymentTransactionSchema = new Schema<PaymentTransaction>(
   {
+    _id: { type: Schema.Types.ObjectId, auto: true },
     id: { type: Number, required: true, unique: true },
     customerCreditId: { type: Number, required: true, index: true },
     amount: { type: Number, required: true, min: 0 },
@@ -73,6 +81,7 @@ const paymentTransactionSchema = new Schema<PaymentTransaction>(
 
 const counterSchema = new Schema(
   {
+    _id: { type: Schema.Types.ObjectId, auto: true },
     key: { type: String, required: true, unique: true },
     value: { type: Number, required: true, default: 0 }
   },

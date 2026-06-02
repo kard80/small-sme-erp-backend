@@ -1,12 +1,19 @@
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { initiateDb, disconnectPersistence, CustomerCreditModel, OrderModel, PaymentTransactionModel } from '../src/shared/persistence';
+import {
+  initiateDb,
+  disconnectPersistence,
+  CustomerCreditModel,
+  OrderModel,
+  PaymentTransactionModel,
+  ProductModel
+} from '../src/shared/persistence';
 import { createRestApp } from '../src/restApp';
 
 const describeIfMongo = process.env.MONGODB_URI ? describe : describe.skip;
 
 const loginAsAdmin = async (app: ReturnType<typeof createRestApp>) => {
-  const response = await request(app).post('/api/auth/login').send({
+  const response = await request(app).post('/api/v1/auth/login').send({
     username: 'admin',
     password: '1234'
   });
@@ -35,7 +42,7 @@ const createOrder = async (
   }> = {}
 ) => {
   return request(app)
-    .post('/api/sales/orders')
+    .post('/api/v1/orders')
     .set('Authorization', `Bearer ${accessToken}`)
     .send({
       productId: 1,
@@ -57,6 +64,7 @@ describeIfMongo('ERP backend', () => {
 
   beforeEach(async () => {
     await Promise.all([
+      ProductModel.deleteMany({}),
       PaymentTransactionModel.deleteMany({}),
       CustomerCreditModel.deleteMany({}),
       OrderModel.deleteMany({})
@@ -78,6 +86,43 @@ describeIfMongo('ERP backend', () => {
     expect(response.body.credit.totalAmount).toBe(150);
     expect(response.body.credit.status).toBe('pending');
     expect(response.body.credit.paidAmount).toBe(0);
+  });
+
+  it('creates and updates products with sellPrice, optional defaultBuyPrice, status, and mongo _id', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const created = await request(app)
+      .post('/api/v1/products')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        productName: 'Widget A',
+        unit: 'pcs',
+        sellPrice: 150
+      });
+
+    expect(created.status).toBe(201);
+    expect(created.body.id).toBeDefined();
+    expect(created.body._id).toEqual(expect.any(String));
+    expect(created.body.sellPrice).toBe(150);
+    expect(created.body.defaultBuyPrice).toBeUndefined();
+    expect(created.body.status).toBe('active');
+    expect(created.body.defaultSellPrice).toBeUndefined();
+
+    const updated = await request(app)
+      .patch(`/api/v1/products/${created.body.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        defaultBuyPrice: 100,
+        sellPrice: 175,
+        status: 'inactive'
+      });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body._id).toEqual(created.body._id);
+    expect(updated.body.defaultBuyPrice).toBe(100);
+    expect(updated.body.sellPrice).toBe(175);
+    expect(updated.body.status).toBe('inactive');
   });
 
   it('creates a paid credit when the order starts completed', async () => {
@@ -102,7 +147,7 @@ describeIfMongo('ERP backend', () => {
     const creditId = created.body.credit.id;
 
     const partial = await request(app)
-      .post('/api/finance/payments')
+      .post('/api/v1/finances/payments')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         customerCreditId: creditId,
@@ -116,7 +161,7 @@ describeIfMongo('ERP backend', () => {
     expect(pendingCredit?.paidAmount).toBe(50);
 
     const complete = await request(app)
-      .post('/api/finance/payments')
+      .post('/api/v1/finances/payments')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         customerCreditId: creditId,
@@ -136,10 +181,10 @@ describeIfMongo('ERP backend', () => {
   it('authenticates REST requests with access and refresh tokens', async () => {
     const app = createRestApp();
 
-    const missingToken = await request(app).get('/api/catalog/products');
+    const missingToken = await request(app).get('/api/v1/products');
     expect(missingToken.status).toBe(401);
 
-    const badLogin = await request(app).post('/api/auth/login').send({
+    const badLogin = await request(app).post('/api/v1/auth/login').send({
       username: 'admin',
       password: 'wrong'
     });
@@ -148,7 +193,7 @@ describeIfMongo('ERP backend', () => {
     const tokens = await loginAsAdmin(app);
 
     const me = await request(app)
-      .get('/api/auth/me')
+      .get('/api/v1/auth/me')
       .set('Authorization', `Bearer ${tokens.accessToken}`);
     expect(me.status).toBe(200);
     expect(me.body.user).toMatchObject({
@@ -156,7 +201,7 @@ describeIfMongo('ERP backend', () => {
       username: 'admin'
     });
 
-    const refreshed = await request(app).post('/api/auth/refresh').send({
+    const refreshed = await request(app).post('/api/v1/auth/refresh').send({
       refreshToken: tokens.refreshToken
     });
     expect(refreshed.status).toBe(200);
@@ -165,18 +210,18 @@ describeIfMongo('ERP backend', () => {
     expect(refreshed.body.expiresIn).toBe(900);
     expect(refreshed.body.refreshExpiresIn).toBe(86400);
 
-    const invalidRefresh = await request(app).post('/api/auth/refresh').send({
+    const invalidRefresh = await request(app).post('/api/v1/auth/refresh').send({
       refreshToken: tokens.accessToken
     });
     expect(invalidRefresh.status).toBe(401);
 
     const logout = await request(app)
-      .post('/api/auth/logout')
+      .post('/api/v1/auth/logout')
       .set('Authorization', `Bearer ${tokens.accessToken}`);
     expect(logout.status).toBe(200);
     expect(logout.body.ok).toBe(true);
 
-    const logoutWithoutToken = await request(app).post('/api/auth/logout');
+    const logoutWithoutToken = await request(app).post('/api/v1/auth/logout');
     expect(logoutWithoutToken.status).toBe(401);
   });
 
@@ -187,7 +232,7 @@ describeIfMongo('ERP backend', () => {
     const created = await createOrder(app, accessToken);
 
     await request(app)
-      .post('/api/finance/payments')
+      .post('/api/v1/finances/payments')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         customerCreditId: created.body.credit.id,
@@ -196,7 +241,7 @@ describeIfMongo('ERP backend', () => {
       });
 
     const removed = await request(app)
-      .delete(`/api/sales/orders/${created.body.order.id}`)
+      .delete(`/api/v1/orders/${created.body.order.id}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(removed.status).toBe(204);
@@ -215,7 +260,7 @@ describeIfMongo('ERP backend', () => {
     const { accessToken } = await loginAsAdmin(app);
 
     const created = await request(app)
-      .post('/api/credit/customer-credits')
+      .post('/api/v1/credits/customer-credits')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         orderId: 1,
@@ -226,7 +271,7 @@ describeIfMongo('ERP backend', () => {
       });
 
     const payment = await request(app)
-      .post('/api/finance/payments')
+      .post('/api/v1/finances/payments')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         customerCreditId: created.body.id,
@@ -247,7 +292,7 @@ describeIfMongo('ERP backend', () => {
     const orderId = created.body.order.id;
 
     const paid = await request(app)
-      .post('/api/finance/payments')
+      .post('/api/v1/finances/payments')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         customerCreditId: creditId,
@@ -258,7 +303,7 @@ describeIfMongo('ERP backend', () => {
     expect(paid.status).toBe(201);
 
     const replaced = await request(app)
-      .patch(`/api/finance/payments/${paid.body.id}`)
+      .patch(`/api/v1/finances/payments/${paid.body.id}`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         customerCreditId: creditId,
@@ -277,7 +322,7 @@ describeIfMongo('ERP backend', () => {
     expect(order?.status).toBe('pending');
 
     const removed = await request(app)
-      .delete(`/api/finance/payments/${paid.body.id}`)
+      .delete(`/api/v1/finances/payments/${paid.body.id}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(removed.status).toBe(204);
@@ -300,7 +345,7 @@ describeIfMongo('ERP backend', () => {
     const orderId = created.body.order.id;
 
     const updated = await request(app)
-      .patch(`/api/credit/customer-credits/${creditId}`)
+      .patch(`/api/v1/credits/customer-credits/${creditId}`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         paidAmount: 150
@@ -322,7 +367,7 @@ describeIfMongo('ERP backend', () => {
     const orderId = created.body.order.id;
 
     const paid = await request(app)
-      .post('/api/finance/payments')
+      .post('/api/v1/finances/payments')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         customerCreditId: creditId,
@@ -333,7 +378,7 @@ describeIfMongo('ERP backend', () => {
     expect(paid.status).toBe(201);
 
     const removed = await request(app)
-      .delete(`/api/credit/customer-credits/${creditId}`)
+      .delete(`/api/v1/credits/customer-credits/${creditId}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(removed.status).toBe(204);

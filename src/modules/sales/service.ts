@@ -3,28 +3,28 @@ import { creditService, mapOrderStatusFromCredit } from '../credit/service';
 import { financeRepository } from '../finance/repository';
 import { CreateOrderInput, CreditStatus, OrderStatus } from '../../shared/types';
 import { runInTransaction } from '../../shared/persistence';
-import { salesRepository } from './repository';
+import { orderRepository } from './repository';
 
-export const salesService = {
+export const orderService = {
   createOrder(input: CreateOrderInput) {
     return runInTransaction(async (session) => {
-      const order = await salesRepository.create(input, session);
+      const order = await orderRepository.create(input, session);
       const credit = await creditService.createCreditForOrder(order, session);
       return { order, credit };
     });
   },
 
   listOrders(page: number, pageSize: number) {
-    return salesRepository.list(page, pageSize);
+    return orderRepository.list(page, pageSize);
   },
 
   getOrder(id: number) {
-    return salesRepository.findById(id);
+    return orderRepository.findById(id);
   },
 
   async updateOrder(id: number, input: Partial<CreateOrderInput>, session?: ClientSession) {
     const run = async (activeSession?: ClientSession) => {
-      const order = await salesRepository.update(id, input, activeSession);
+      const order = await orderRepository.update(id, input, activeSession);
       if (!order) {
         return undefined;
       }
@@ -37,16 +37,16 @@ export const salesService = {
   },
 
   async updateOrderStatusFromCredit(orderId: number, status: CreditStatus, session?: ClientSession) {
-    const order = await salesRepository.findById(orderId, session);
+    const order = await orderRepository.findById(orderId, session);
     if (!order || order.status === 'cancelled') {
       return order;
     }
 
-    return salesRepository.update(orderId, { status: mapOrderStatusFromCredit(status) }, session);
+    return orderRepository.update(orderId, { status: mapOrderStatusFromCredit(status) }, session);
   },
 
   async resetOrderStatusAfterCreditRemoval(orderId: number, session?: ClientSession) {
-    const order = await salesRepository.findById(orderId, session);
+    const order = await orderRepository.findById(orderId, session);
     if (!order) {
       return undefined;
     }
@@ -54,16 +54,16 @@ export const salesService = {
       return order;
     }
 
-    return salesRepository.update(orderId, { status: 'pending' }, session);
+    return orderRepository.update(orderId, { status: 'pending' }, session);
   },
 
   setOrderStatus(orderId: number, status: OrderStatus, session?: ClientSession) {
-    return salesRepository.update(orderId, { status }, session);
+    return orderRepository.update(orderId, { status }, session);
   },
 
   removeOrder(id: number) {
     return runInTransaction(async (session) => {
-      const order = await salesRepository.remove(id, session);
+      const order = await orderRepository.remove(id, session);
       if (!order) {
         return undefined;
       }

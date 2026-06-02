@@ -1,9 +1,9 @@
 import { ClientSession } from 'mongoose';
 import { CustomerCreditModel, nextSequence } from '../../shared/persistence';
-import { CustomerCredit } from '../../shared/types';
+import { CustomerCredit, EntityPatch, NewEntity } from '../../shared/types';
 
 export const creditRepository = {
-  async create(input: Omit<CustomerCredit, 'id'>, session?: ClientSession) {
+  async create(input: NewEntity<CustomerCredit, 'id'>, session?: ClientSession) {
     const [credit] = await CustomerCreditModel.create(
       [
         {
@@ -32,7 +32,7 @@ export const creditRepository = {
     return CustomerCreditModel.find({ orderId }).sort({ id: 1 }).lean<CustomerCredit[]>();
   },
 
-  update(id: number, input: Partial<Omit<CustomerCredit, 'id'>>, session?: ClientSession) {
+  update(id: number, input: EntityPatch<CustomerCredit, 'id'>, session?: ClientSession) {
     return CustomerCreditModel.findOneAndUpdate({ id }, { $set: input }, { new: true, runValidators: true }).lean<
       CustomerCredit | null
     >().session(session ?? null);

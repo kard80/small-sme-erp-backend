@@ -1,8 +1,8 @@
 import { ClientSession } from 'mongoose';
 import { OrderModel, nextSequence } from '../../shared/persistence';
-import { CreateOrderInput, Order } from '../../shared/types';
+import { CreateOrderInput, EntityPatch, Order } from '../../shared/types';
 
-export const salesRepository = {
+export const orderRepository = {
   async create(input: CreateOrderInput, session?: ClientSession) {
     const [order] = await OrderModel.create(
       [
@@ -29,7 +29,7 @@ export const salesRepository = {
     return OrderModel.findOne({ id }).session(session ?? null).lean<Order | null>();
   },
 
-  update(id: number, input: Partial<Omit<Order, 'id'>>, session?: ClientSession) {
+  update(id: number, input: EntityPatch<Order, 'id'>, session?: ClientSession) {
     return OrderModel.findOneAndUpdate({ id }, { $set: input }, { new: true, runValidators: true }).lean<
       Order | null
     >().session(session ?? null);

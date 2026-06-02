@@ -1,7 +1,7 @@
 import { ClientSession } from 'mongoose';
 import { runInTransaction } from '../../shared/persistence';
 import { financeRepository } from '../finance/repository';
-import { CreditStatus, CustomerCredit, OrderStatus } from '../../shared/types';
+import { CreditStatus, CustomerCredit, EntityPatch, NewEntity, OrderStatus } from '../../shared/types';
 import { creditRepository } from './repository';
 
 export const normalizeCreditStatus = (credit: CustomerCredit): CreditStatus => {
@@ -21,7 +21,7 @@ export const mapOrderStatusFromCredit = (status: CreditStatus): OrderStatus => {
 };
 
 export const creditService = {
-  createCustomerCredit(input: Omit<CustomerCredit, 'id'>) {
+  createCustomerCredit(input: NewEntity<CustomerCredit, 'id'>) {
     return creditRepository.create(input);
   },
 
@@ -82,7 +82,7 @@ export const creditService = {
     }, session);
   },
 
-  async updateCustomerCredit(id: number, input: Partial<Omit<CustomerCredit, 'id'>>, session?: ClientSession) {
+  async updateCustomerCredit(id: number, input: EntityPatch<CustomerCredit, 'id'>, session?: ClientSession) {
     const existing = await creditRepository.findById(id, session);
     if (!existing) {
       return undefined;

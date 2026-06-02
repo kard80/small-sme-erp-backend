@@ -1,22 +1,33 @@
+import { Types } from 'mongoose';
+
 export type OrderStatus = 'pending' | 'completed' | 'cancelled';
 export type CreditStatus = 'pending' | 'paid' | 'cancelled';
+export type ProductStatus = 'active' | 'inactive';
 
-export interface Product {
+export interface MongoEntity {
+  _id: Types.ObjectId;
+}
+
+export type NewEntity<T extends MongoEntity, GeneratedKey extends keyof T> = Omit<T, GeneratedKey | '_id'>;
+export type EntityPatch<T extends MongoEntity, GeneratedKey extends keyof T> = Partial<Omit<T, GeneratedKey | '_id'>>;
+
+export interface Product extends MongoEntity {
   id: number;
   productName: string;
   unit: string;
-  defaultBuyPrice: number;
-  defaultSellPrice: number;
+  defaultBuyPrice?: number;
+  sellPrice: number;
+  status: ProductStatus;
 }
 
-export interface Customer {
+export interface Customer extends MongoEntity {
   customerId: number;
   customerName: string;
   address: string;
   billName: string;
 }
 
-export interface Order {
+export interface Order extends MongoEntity {
   id: number;
   productId: number;
   productName: string;
@@ -28,7 +39,7 @@ export interface Order {
   status: OrderStatus;
 }
 
-export interface CustomerCredit {
+export interface CustomerCredit extends MongoEntity {
   id: number;
   orderId: number;
   customerId: number;
@@ -37,7 +48,7 @@ export interface CustomerCredit {
   status: CreditStatus;
 }
 
-export interface PaymentTransaction {
+export interface PaymentTransaction extends MongoEntity {
   id: number;
   customerCreditId: number;
   amount: number;

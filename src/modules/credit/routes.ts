@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { salesService } from '../sales/service';
+import { orderService } from '../sales/service';
 import { errorMessage, parseIdParam } from '../../shared/http';
 import { runInTransaction } from '../../shared/persistence';
 import { customerCreditSchema, customerCreditUpdateSchema } from './schemas';
@@ -52,7 +52,7 @@ export const createCreditRouter = () => {
           return undefined;
         }
 
-        const order = await salesService.updateOrderStatusFromCredit(updatedCredit.orderId, updatedCredit.status, session);
+        const order = await orderService.updateOrderStatusFromCredit(updatedCredit.orderId, updatedCredit.status, session);
         if (!order) {
           throw new Error('Linked order not found');
         }
@@ -83,7 +83,7 @@ export const createCreditRouter = () => {
           return undefined;
         }
 
-        const order = await salesService.resetOrderStatusAfterCreditRemoval(deletedCredit.orderId, session);
+        const order = await orderService.resetOrderStatusAfterCreditRemoval(deletedCredit.orderId, session);
         if (!order) {
           throw new Error('Linked order not found');
         }

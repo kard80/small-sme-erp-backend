@@ -1,33 +1,33 @@
 import { productSchema } from './schemas';
-import { catalogRepository } from './repository';
+import { productRepository } from './repository';
 
-export const catalogService = {
-  createProduct(input: Parameters<typeof catalogRepository.create>[0]) {
-    return catalogRepository.create(input);
+export const productService = {
+  createProduct(input: Parameters<typeof productRepository.create>[0]) {
+    return productRepository.create(input);
   },
 
   listProducts(page: number, pageSize: number) {
-    return catalogRepository.list(page, pageSize);
+    return productRepository.list(page, pageSize);
   },
 
-  updateProduct(id: number, input: Parameters<typeof catalogRepository.update>[1]) {
-    return catalogRepository.update(id, input);
+  updateProduct(id: number, input: Parameters<typeof productRepository.update>[1]) {
+    return productRepository.update(id, input);
   },
 
   removeProduct(id: number) {
-    return catalogRepository.remove(id);
+    return productRepository.remove(id);
   },
 
   async importProducts(rows: Array<Array<string | number | undefined>>) {
     const created = [];
     for (const row of rows) {
-      const [productName, unit, defaultBuyPrice, defaultSellPrice] = row;
-      const parsed = productSchema.safeParse({ productName, unit, defaultBuyPrice, defaultSellPrice });
+      const [productName, unit, defaultBuyPrice, sellPrice, status] = row;
+      const parsed = productSchema.safeParse({ productName, unit, defaultBuyPrice, sellPrice, status });
       if (!parsed.success) {
         continue;
       }
 
-      created.push(await catalogRepository.create(parsed.data));
+      created.push(await productRepository.create(parsed.data));
     }
 
     return {
