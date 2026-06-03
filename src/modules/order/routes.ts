@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { parseIdParam, paginationSchema } from '../../shared/http';
+import { Types } from 'mongoose';
+import { parseObjectIdParam, paginationSchema } from '../../shared/http';
 import { orderImageOcrInputSchema, orderInputSchema, orderOcrUploadBatchInputSchema, orderUpdateSchema } from './schemas';
 import { orderService } from './service';
 
@@ -24,6 +25,43 @@ export const createOrderRouter = () => {
     return res.json(await orderService.listOrders(parsed.data.page, parsed.data.pageSize));
   });
 
+  router.get('/:orderId/delivery-note', async (req, res) => {
+    const orderId = req.params.orderId;
+    if (typeof orderId !== 'string' || !Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: 'รหัสคำสั่งซื้อไม่ถูกต้อง' });
+    }
+
+    return res.json(await orderService.getDeliveryNoteDownloadUrl(orderId));
+  });
+
+  router.post('/:orderId/delivery-note', async (req, res) => {
+    const orderId = req.params.orderId;
+    if (typeof orderId !== 'string' || !Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: 'รหัสคำสั่งซื้อไม่ถูกต้อง' });
+    }
+
+    const order = await orderService.createDeliveryNote(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+
+    return res.status(201).json(order);
+  });
+
+  router.get('/:orderId', async (req, res) => {
+    const orderId = req.params.orderId;
+    if (typeof orderId !== 'string' || !Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: 'รหัสคำสั่งซื้อไม่ถูกต้อง' });
+    }
+
+    const order = await orderService.getOrderWithItems(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
+    }
+
+    return res.json(order);
+  });
+
   router.post('/ocr', async (req, res) => {
     const input = orderImageOcrInputSchema.safeParse(req.body);
     if (!input.success) {
@@ -43,7 +81,7 @@ export const createOrderRouter = () => {
   });
 
   router.patch('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'คำสั่งซื้อ');
+    const id = parseObjectIdParam(req, res, 'คำสั่งซื้อ');
     const input = orderUpdateSchema.safeParse(req.body);
     if (id === undefined) {
       return;
@@ -61,7 +99,7 @@ export const createOrderRouter = () => {
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'คำสั่งซื้อ');
+    const id = parseObjectIdParam(req, res, 'คำสั่งซื้อ');
     if (id === undefined) {
       return;
     }

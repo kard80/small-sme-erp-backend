@@ -5,7 +5,9 @@ import { extractProductImportRows } from '../src/modules/product/routes';
 import {
   initiateDb,
   disconnectPersistence,
+  CustomerModel,
   CustomerCreditModel,
+  OrderItemModel,
   OrderModel,
   PaymentTransactionModel,
   ProductModel
@@ -35,28 +37,38 @@ const createOrder = async (
   app: ReturnType<typeof createRestApp>,
   accessToken: string,
   overrides: Partial<{
-    productId: string;
-    productName: string;
-    unit: string;
-    buyPrice: number;
-    sellPrice: number;
     customerId: number;
     dueDate: string;
-    status: 'pending' | 'completed' | 'cancelled';
+    deliveryDate: string;
+    status: 'draft' | 'completed';
+    items: Array<{
+      productId: string;
+      productName: string;
+      unit: string;
+      quantity: number;
+      buyPrice: number;
+      sellPrice: number;
+    }>;
   }> = {}
 ) => {
   return request(app)
     .post('/api/v1/orders')
     .set('Authorization', `Bearer ${accessToken}`)
     .send({
-      productId: testProductId,
-      productName: 'Widget A',
-      unit: 'pcs',
-      buyPrice: 100,
-      sellPrice: 150,
       customerId: 99,
       dueDate: '2026-06-30',
-      status: 'pending',
+      deliveryDate: '2026-06-20',
+      status: 'draft',
+      items: [
+        {
+          productId: testProductId,
+          productName: 'Widget A',
+          unit: 'pcs',
+          quantity: 1,
+          buyPrice: 100,
+          sellPrice: 150
+        }
+      ],
       ...overrides
     });
 };
@@ -68,9 +80,11 @@ describeIfMongo('ERP backend', () => {
 
   beforeEach(async () => {
     await Promise.all([
+      CustomerModel.deleteMany({}),
       ProductModel.deleteMany({}),
       PaymentTransactionModel.deleteMany({}),
       CustomerCreditModel.deleteMany({}),
+      OrderItemModel.deleteMany({}),
       OrderModel.deleteMany({})
     ]);
   });
@@ -79,17 +93,335 @@ describeIfMongo('ERP backend', () => {
     await disconnectPersistence();
   });
 
-  it('creates order via REST and auto-creates customer credit', async () => {
+  it('creates a draft order with order items only', async () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
     const response = await createOrder(app, accessToken);
 
     expect(response.status).toBe(201);
-    expect(response.body.order.id).toBeDefined();
+    expect(response.body.order._id).toEqual(expect.any(String));
+    expect(response.body.order.createdAt).toEqual(expect.any(String));
+    expect(response.body.order.completedAt).toBeNull();
+    expect(response.body.order.cancelledAt).toBeNull();
+    expect(response.body.order.deliveryDate).toBe('2026-06-20');
+    expect(response.body.orderItems).toHaveLength(1);
+    expect(response.body.orderItems[0]).toMatchObject({
+      orderId: response.body.order._id,
+      order: 1,
+      quantity: 1,
+      lineTotal: 150
+    });
+    expect(response.body.credit).toBeUndefined();
+    expect(response.body.deliveryNote).toBeUndefined();
+  });
+
+  it('lists customers with the standard paginated response shape', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const created = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        customerName: 'Acme Co.',
+        address: '123 Main St',
+        billName: 'Acme Billing'
+      });
+
+    expect(created.status).toBe(201);
+
+    const response = await request(app)
+      .get('/api/v1/customers?page=1&pageSize=10')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      page: 1,
+      pageSize: 10,
+      total: 1
+    });
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0]).toMatchObject({
+      customerName: 'Acme Co.',
+      address: '123 Main St',
+      billName: 'Acme Billing'
+    });
+  });
+
+  it('creates a completed order with credit and delivery note', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const response = await createOrder(app, accessToken, { status: 'completed' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.order.completedAt).toEqual(expect.any(String));
+    expect(response.body.order.deliveryNote).toMatch(/^DN\d{8}\.pdf$/);
+    expect(response.body.orderItems).toHaveLength(1);
     expect(response.body.credit.totalAmount).toBe(150);
-    expect(response.body.credit.status).toBe('pending');
-    expect(response.body.credit.paidAmount).toBe(0);
+    expect(response.body.credit.status).toBe('paid');
+    expect(response.body.credit.paidAmount).toBe(150);
+    expect(response.body.deliveryNote).toBeUndefined();
+  });
+
+  it('creates order items and derives order totals from them', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const response = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        customerId: 99,
+        dueDate: '2026-06-30',
+        deliveryDate: '2026-06-20',
+        status: 'draft',
+        items: [
+          {
+            productId: testProductId,
+            productName: 'Widget A',
+            unit: 'pcs',
+            quantity: 2,
+            buyPrice: 100,
+            sellPrice: 150
+          },
+          {
+            productId: testProductId,
+            productName: 'Widget B',
+            unit: 'pcs',
+            quantity: 1,
+            buyPrice: 50,
+            sellPrice: 80
+          }
+        ]
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.order.customerId).toBe(99);
+    expect(response.body.order.dueDate).toBe('2026-06-30');
+    expect(response.body.order.deliveryDate).toBe('2026-06-20');
+    expect(response.body.credit).toBeUndefined();
+    expect(response.body.orderItems).toHaveLength(2);
+    expect(response.body.orderItems[0]).toMatchObject({
+      order: 1,
+      productName: 'Widget A',
+      quantity: 2,
+      lineTotal: 300
+    });
+    expect(response.body.orderItems[1]).toMatchObject({
+      order: 2,
+      productName: 'Widget B',
+      quantity: 1,
+      lineTotal: 80
+    });
+  });
+
+  it('gets a specific order with its order items', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const customer = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        customerName: 'Acme Co.',
+        address: '123 Main St',
+        billName: 'Acme Billing'
+      });
+
+    const created = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        customerId: customer.body._id,
+        dueDate: '2026-06-30',
+        deliveryDate: '2026-06-20',
+        status: 'draft',
+        items: [
+          {
+            productId: testProductId,
+            productName: 'Widget A',
+            unit: 'pcs',
+            quantity: 2,
+            buyPrice: 100,
+            sellPrice: 150
+          }
+        ]
+      });
+
+    const response = await request(app)
+      .get(`/api/v1/orders/${created.body.order._id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.order).toMatchObject({
+      _id: created.body.order._id
+    });
+    expect(response.body.orderItems).toHaveLength(1);
+    expect(response.body.orderItems[0]).toMatchObject({
+      orderId: created.body.order._id,
+      productName: 'Widget A',
+      quantity: 2,
+      lineTotal: 300
+    });
+  });
+
+  it('patches a draft order and keeps it as a draft', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const created = await createOrder(app, accessToken);
+
+    const updated = await request(app)
+      .patch(`/api/v1/orders/${created.body.order._id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        dueDate: '2026-07-15',
+        deliveryDate: '2026-07-10',
+        items: [
+          {
+            productId: testProductId,
+            productName: 'Widget B',
+            unit: 'box',
+            quantity: 2,
+            buyPrice: 80,
+            sellPrice: 120
+          }
+        ]
+      });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.order.dueDate).toBe('2026-07-15');
+    expect(updated.body.order.deliveryDate).toBe('2026-07-10');
+    expect(updated.body.order.completedAt).toBeNull();
+    expect(updated.body.order.deliveryNote).toBeUndefined();
+    expect(updated.body.orderItems).toHaveLength(1);
+    expect(updated.body.orderItems[0]).toMatchObject({
+      order: 1,
+      productName: 'Widget B',
+      unit: 'box',
+      quantity: 2,
+      lineTotal: 240,
+      completedAt: null
+    });
+
+    const creditCount = await CustomerCreditModel.countDocuments({ orderId: created.body.order._id });
+    expect(creditCount).toBe(0);
+  });
+
+  it('patches a draft order to completed and creates credit and delivery note', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const created = await createOrder(app, accessToken);
+
+    const updated = await request(app)
+      .patch(`/api/v1/orders/${created.body.order._id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        status: 'completed',
+        items: [
+          {
+            productId: testProductId,
+            productName: 'Widget C',
+            unit: 'pack',
+            quantity: 3,
+            buyPrice: 90,
+            sellPrice: 140
+          }
+        ]
+      });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.order.completedAt).toEqual(expect.any(String));
+    expect(updated.body.order.deliveryNote).toMatch(/^DN\d{8}\.pdf$/);
+    expect(updated.body.orderItems).toHaveLength(1);
+    expect(updated.body.orderItems[0].completedAt).toEqual(expect.any(String));
+    expect(updated.body.credit).toMatchObject({
+      totalAmount: 420,
+      paidAmount: 420,
+      status: 'paid'
+    });
+    expect(updated.body.deliveryNote).toBeUndefined();
+  });
+
+  it('rejects patching a completed order', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const created = await createOrder(app, accessToken, { status: 'completed' });
+
+    const updated = await request(app)
+      .patch(`/api/v1/orders/${created.body.order._id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        dueDate: '2026-07-20'
+      });
+
+    expect(updated.status).toBe(400);
+    expect(updated.body).toEqual({ error: 'ไม่สามารถแก้ไขคำสั่งซื้อที่เสร็จสิ้นแล้วได้' });
+  });
+
+  it('creates a delivery note manually for an existing completed order and reuses the same filename on replacement', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const created = await createOrder(app, accessToken, { status: 'draft' });
+
+    const completed = await request(app)
+      .patch(`/api/v1/orders/${created.body.order._id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        status: 'completed'
+      });
+
+    expect(completed.status).toBe(200);
+    const originalFilename = completed.body.order.deliveryNote;
+    expect(originalFilename).toMatch(/^DN\d{8}\.pdf$/);
+
+    const removedDeliveryNote = await OrderModel.findOneAndUpdate(
+      { _id: created.body.order._id },
+      { $unset: { deliveryNote: 1 } },
+      { returnDocument: 'after' }
+    ).lean();
+
+    expect(removedDeliveryNote?.deliveryNote).toBeUndefined();
+
+    const generated = await request(app)
+      .post(`/api/v1/orders/${created.body.order._id}/delivery-note`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send();
+
+    expect(generated.status).toBe(201);
+    expect(generated.body.order.deliveryNote).toMatch(/^DN\d{8}\.pdf$/);
+    expect(generated.body.orderItems).toHaveLength(1);
+
+    const replaced = await request(app)
+      .post(`/api/v1/orders/${created.body.order._id}/delivery-note`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send();
+
+    expect(replaced.status).toBe(201);
+    expect(replaced.body.order.deliveryNote).toBe(generated.body.order.deliveryNote);
+    expect(replaced.body.order.deliveryNote).not.toBe(originalFilename);
+  });
+
+  it('rejects creating a delivery note manually for a draft order', async () => {
+    const app = createRestApp();
+    const { accessToken } = await loginAsAdmin(app);
+
+    const created = await createOrder(app, accessToken);
+
+    const response = await request(app)
+      .post(`/api/v1/orders/${created.body.order._id}/delivery-note`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send();
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: 'สามารถสร้างใบส่งของได้เฉพาะคำสั่งซื้อที่เสร็จสิ้นแล้วเท่านั้น'
+    });
   });
 
   it('creates and updates products with sellPrice, optional defaultBuyPrice, status, and mongo _id', async () => {
@@ -260,10 +592,22 @@ describeIfMongo('ERP backend', () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
-    const response = await createOrder(app, accessToken, { status: 'completed', sellPrice: 225 });
+    const response = await createOrder(app, accessToken, {
+      status: 'completed',
+      items: [
+        {
+          productId: testProductId,
+          productName: 'Widget A',
+          unit: 'pcs',
+          quantity: 1,
+          buyPrice: 100,
+          sellPrice: 225
+        }
+      ]
+    });
 
     expect(response.status).toBe(201);
-    expect(response.body.order.status).toBe('completed');
+    expect(response.body.order.completedAt).toEqual(expect.any(String));
     expect(response.body.credit.totalAmount).toBe(225);
     expect(response.body.credit.paidAmount).toBe(225);
     expect(response.body.credit.status).toBe('paid');
@@ -273,9 +617,9 @@ describeIfMongo('ERP backend', () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
-    const created = await createOrder(app, accessToken);
+    const created = await createOrder(app, accessToken, { status: 'completed' });
 
-    const creditId = created.body.credit.id;
+    const creditId = created.body.credit._id;
 
     const partial = await request(app)
       .post('/api/v1/finances/payments')
@@ -287,7 +631,7 @@ describeIfMongo('ERP backend', () => {
       });
 
     expect(partial.status).toBe(201);
-    const pendingCredit = await CustomerCreditModel.findOne({ id: creditId }).lean();
+    const pendingCredit = await CustomerCreditModel.findOne({ _id: creditId }).lean();
     expect(pendingCredit?.status).toBe('pending');
     expect(pendingCredit?.paidAmount).toBe(50);
 
@@ -302,11 +646,11 @@ describeIfMongo('ERP backend', () => {
 
     expect(complete.status).toBe(201);
     const [paidCredit, completedOrder] = await Promise.all([
-      CustomerCreditModel.findOne({ id: creditId }).lean(),
-      OrderModel.findOne({ id: created.body.order.id }).lean()
+      CustomerCreditModel.findOne({ _id: creditId }).lean(),
+      OrderModel.findOne({ _id: created.body.order._id }).lean()
     ]);
     expect(paidCredit?.status).toBe('paid');
-    expect(completedOrder?.status).toBe('completed');
+    expect(completedOrder?.completedAt).toEqual(expect.any(String));
   });
 
   it('authenticates REST requests with access and refresh tokens', async () => {
@@ -360,19 +704,19 @@ describeIfMongo('ERP backend', () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
-    const created = await createOrder(app, accessToken);
+    const created = await createOrder(app, accessToken, { status: 'completed' });
 
     await request(app)
       .post('/api/v1/finances/payments')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
-        customerCreditId: created.body.credit.id,
+        customerCreditId: created.body.credit._id,
         amount: 50,
         paymentDate: '2026-06-01'
       });
 
     const removed = await request(app)
-      .delete(`/api/v1/orders/${created.body.order.id}`)
+      .delete(`/api/v1/orders/${created.body.order._id}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(removed.status).toBe(204);
@@ -394,7 +738,7 @@ describeIfMongo('ERP backend', () => {
       .post('/api/v1/credits/customer-credits')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
-        orderId: 1,
+        orderId: new Types.ObjectId().toString(),
         customerId: 99,
         totalAmount: 150,
         paidAmount: 0,
@@ -405,7 +749,7 @@ describeIfMongo('ERP backend', () => {
       .post('/api/v1/finances/payments')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
-        customerCreditId: created.body.id,
+        customerCreditId: created.body._id,
         amount: 50,
         paymentDate: '2026-06-01'
       });
@@ -418,9 +762,9 @@ describeIfMongo('ERP backend', () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
-    const created = await createOrder(app, accessToken);
-    const creditId = created.body.credit.id;
-    const orderId = created.body.order.id;
+    const created = await createOrder(app, accessToken, { status: 'completed' });
+    const creditId = created.body.credit._id;
+    const orderId = created.body.order._id;
 
     const paid = await request(app)
       .post('/api/v1/finances/payments')
@@ -434,7 +778,7 @@ describeIfMongo('ERP backend', () => {
     expect(paid.status).toBe(201);
 
     const replaced = await request(app)
-      .patch(`/api/v1/finances/payments/${paid.body.id}`)
+      .patch(`/api/v1/finances/payments/${paid.body._id}`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         customerCreditId: creditId,
@@ -445,35 +789,37 @@ describeIfMongo('ERP backend', () => {
     expect(replaced.status).toBe(200);
 
     let [credit, order] = await Promise.all([
-      CustomerCreditModel.findOne({ id: creditId }).lean(),
-      OrderModel.findOne({ id: orderId }).lean()
+      CustomerCreditModel.findOne({ _id: creditId }).lean(),
+      OrderModel.findOne({ _id: orderId }).lean()
     ]);
     expect(credit?.paidAmount).toBe(50);
     expect(credit?.status).toBe('pending');
-    expect(order?.status).toBe('pending');
+    expect(order?.completedAt).toBeNull();
+    expect(order?.cancelledAt).toBeNull();
 
     const removed = await request(app)
-      .delete(`/api/v1/finances/payments/${paid.body.id}`)
+      .delete(`/api/v1/finances/payments/${paid.body._id}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(removed.status).toBe(204);
 
     [credit, order] = await Promise.all([
-      CustomerCreditModel.findOne({ id: creditId }).lean(),
-      OrderModel.findOne({ id: orderId }).lean()
+      CustomerCreditModel.findOne({ _id: creditId }).lean(),
+      OrderModel.findOne({ _id: orderId }).lean()
     ]);
     expect(credit?.paidAmount).toBe(0);
     expect(credit?.status).toBe('pending');
-    expect(order?.status).toBe('pending');
+    expect(order?.completedAt).toBeNull();
+    expect(order?.cancelledAt).toBeNull();
   });
 
   it('updates the linked order when patching a customer credit', async () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
-    const created = await createOrder(app, accessToken);
-    const creditId = created.body.credit.id;
-    const orderId = created.body.order.id;
+    const created = await createOrder(app, accessToken, { status: 'completed' });
+    const creditId = created.body.credit._id;
+    const orderId = created.body.order._id;
 
     const updated = await request(app)
       .patch(`/api/v1/credits/customer-credits/${creditId}`)
@@ -485,17 +831,17 @@ describeIfMongo('ERP backend', () => {
     expect(updated.status).toBe(200);
     expect(updated.body.status).toBe('paid');
 
-    const order = await OrderModel.findOne({ id: orderId }).lean();
-    expect(order?.status).toBe('completed');
+    const order = await OrderModel.findOne({ _id: orderId }).lean();
+    expect(order?.completedAt).toEqual(expect.any(String));
   });
 
   it('resets the linked order and removes payments when deleting a customer credit', async () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
-    const created = await createOrder(app, accessToken);
-    const creditId = created.body.credit.id;
-    const orderId = created.body.order.id;
+    const created = await createOrder(app, accessToken, { status: 'completed' });
+    const creditId = created.body.credit._id;
+    const orderId = created.body.order._id;
 
     const paid = await request(app)
       .post('/api/v1/finances/payments')
@@ -515,12 +861,13 @@ describeIfMongo('ERP backend', () => {
     expect(removed.status).toBe(204);
 
     const [credit, order, paymentsCount] = await Promise.all([
-      CustomerCreditModel.findOne({ id: creditId }).lean(),
-      OrderModel.findOne({ id: orderId }).lean(),
+      CustomerCreditModel.findOne({ _id: creditId }).lean(),
+      OrderModel.findOne({ _id: orderId }).lean(),
       PaymentTransactionModel.countDocuments({ customerCreditId: creditId })
     ]);
     expect(credit).toBeNull();
-    expect(order?.status).toBe('pending');
+    expect(order?.completedAt).toBeNull();
+    expect(order?.cancelledAt).toBeNull();
     expect(paymentsCount).toBe(0);
   });
 

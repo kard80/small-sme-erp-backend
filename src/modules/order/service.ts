@@ -1,27 +1,31 @@
 import { extname } from 'node:path';
-import { ClientSession } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-import { creditService, mapOrderStatusFromCredit } from '../credit/service';
+import { creditService } from '../credit/service';
 import { customersRepository } from '../customers/repository';
 import { financeRepository } from '../finance/repository';
+import { orderItemRepository } from '../order-item/repository';
 import { productRepository } from '../product/repository';
-import { CreateOrderInput, CreditStatus, OrderStatus } from '../../shared/types';
-import { BadRequestError, InternalServerError } from '../../shared/errors';
-import { createSignedImageUploadUrl } from '../../shared/gcs';
+import { CreateOrderInput, CreditStatus, Order } from '../../shared/types';
+import { BadRequestError, InternalServerError, NotFoundError } from '../../shared/errors';
+import { createSignedImageUploadUrl, createSignedObjectDownloadUrl, uploadObjectToBucket } from '../../shared/gcs';
 import { runInTransaction } from '../../shared/persistence';
 import { createOpenAiClient, getOpenAiModel } from '../../shared/openai';
+import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { orderRepository } from './repository';
+
+const deliveryNoteBucketName = 'correction-department-private';
 
 const orderOcrSchema = z.object({
   productName: z.string().trim().min(1).nullable(),
   unit: z.string().trim().min(1).nullable(),
   buyPrice: z.number().nonnegative().nullable(),
   sellPrice: z.number().nonnegative().nullable(),
-  customerId: z.number().int().positive().nullable(),
+  customerId: z.string().trim().min(1).nullable(),
   customerName: z.string().trim().min(1).nullable(),
   dueDate: z.string().trim().min(1).nullable(),
-  status: z.enum(['pending', 'completed', 'cancelled']).nullable(),
+  status: z.enum(['draft', 'completed']).nullable(),
   notes: z.array(z.string().trim().min(1)).default([])
 });
 
@@ -61,16 +65,110 @@ const normalizeParsedOrder = (parsed: ParsedOrderOcr) => ({
   customerId: parsed.customerId ?? undefined,
   customerName: parsed.customerName ?? undefined,
   dueDate: parsed.dueDate ?? undefined,
+  deliveryDate: parsed.dueDate ?? undefined,
   status: parsed.status ?? undefined,
   notes: parsed.notes
 });
 
+const getOrderLifecycleFields = (status: CreateOrderInput['status']) => {
+  const now = new Date();
+  return {
+    completedAt: status === 'completed' ? now : null,
+    cancelledAt: null
+  } satisfies Pick<Order, 'completedAt' | 'cancelledAt'>;
+};
+
+const getCustomerBillingSnapshot = async (customerId: string, session?: ClientSession) => {
+  const customer = await customersRepository.findById(customerId, session);
+  if (!customer) {
+    throw new BadRequestError('ไม่พบลูกค้า');
+  }
+
+  return {
+    customerId: customer._id.toString(),
+    customerBillName: customer.billName,
+    customerBillAddress: customer.address
+  };
+};
+
+const resolveOrderItems = (
+  input: CreateOrderInput,
+  customerSnapshot: Awaited<ReturnType<typeof getCustomerBillingSnapshot>>
+) => {
+  const items = input.items;
+  const totalAmount = items.reduce((total, item) => total + item.sellPrice * item.quantity, 0);
+  const lifecycle = getOrderLifecycleFields(input.status);
+
+  return {
+    items,
+    lifecycle,
+    totalAmount,
+    orderInput: {
+      customerId: customerSnapshot.customerId,
+      customerBillName: customerSnapshot.customerBillName,
+      customerBillAddress: customerSnapshot.customerBillAddress,
+      totalAmount,
+      dueDate: input.dueDate,
+      deliveryDate: input.deliveryDate,
+      deliveryNote: undefined,
+      ...lifecycle
+    }
+  };
+};
+
+const getPersistedOrderStatus = (order: Pick<Order, 'completedAt'>): CreateOrderInput['status'] =>
+  order.completedAt ? 'completed' : 'draft';
+
+const getDeliveryNoteDocumentNumber = async (order: Pick<Order, 'deliveryNote'>, session?: ClientSession) => {
+  const existingFilename = order.deliveryNote?.trim();
+  if (existingFilename) {
+    return existingFilename.replace(/\.pdf$/i, '');
+  }
+
+  return generateDeliveryNoteNumber(session);
+};
+
+const upsertDeliveryNoteForOrder = async (
+  order: Order,
+  orderItems: Awaited<ReturnType<typeof orderItemRepository.listByOrderId>>,
+  session?: ClientSession
+) => {
+  const documentNumber = await getDeliveryNoteDocumentNumber(order, session);
+  const deliveryNotePdf = await generateDeliveryNotePdfBuffer(order, orderItems, documentNumber);
+  await uploadObjectToBucket(
+    deliveryNoteBucketName,
+    `DN/${deliveryNotePdf.filename}`,
+    deliveryNotePdf.bytes,
+    deliveryNotePdf.contentType
+  );
+
+  if (order.deliveryNote === deliveryNotePdf.filename) {
+    return order;
+  }
+
+  const updatedOrder = await orderRepository.update(order._id.toString(), { deliveryNote: deliveryNotePdf.filename }, session);
+  if (!updatedOrder) {
+    throw new InternalServerError('ไม่พบคำสั่งซื้อหลังจากสร้างใบส่งของ');
+  }
+
+  return updatedOrder;
+};
+
 export const orderService = {
   createOrder(input: CreateOrderInput) {
     return runInTransaction(async (session) => {
-      const order = await orderRepository.create(input, session);
-      const credit = await creditService.createCreditForOrder(order, session);
-      return { order, credit };
+      const customerSnapshot = await getCustomerBillingSnapshot(input.customerId, session);
+      const { items, lifecycle, totalAmount, orderInput } = resolveOrderItems(input, customerSnapshot);
+      const order = await orderRepository.create(orderInput, session);
+      const orderItems = await orderItemRepository.createMany(order._id.toString(), items, lifecycle, session);
+      if (!order.completedAt) {
+        return { order, orderItems };
+      }
+
+      const credit = await creditService.createCreditForOrder({ ...order, totalAmount }, session);
+      const updatedOrder = await upsertDeliveryNoteForOrder(order, orderItems, session);
+
+      return { order: updatedOrder, orderItems, credit };
     });
   },
 
@@ -78,59 +176,174 @@ export const orderService = {
     return orderRepository.list(page, pageSize);
   },
 
-  getOrder(id: number) {
+  getOrder(id: string) {
     return orderRepository.findById(id);
   },
 
-  async updateOrder(id: number, input: Partial<CreateOrderInput>, session?: ClientSession) {
+  async getOrderWithItems(id: string, session?: ClientSession) {
+    const [order, orderItems] = await Promise.all([
+      orderRepository.findById(id, session),
+      orderItemRepository.listByOrderId(id, session)
+    ]);
+
+    if (!order) {
+      return undefined;
+    }
+
+    return { order, orderItems };
+  },
+
+  async getDeliveryNoteDownloadUrl(orderId: string) {
+    const order = await orderRepository.findById(orderId);
+    if (!order) {
+      throw new NotFoundError('ไม่พบคำสั่งซื้อ');
+    }
+    if (!order.deliveryNote) {
+      throw new NotFoundError('ไม่พบใบส่งของสำหรับคำสั่งซื้อนี้');
+    }
+
+    return createSignedObjectDownloadUrl({
+      bucketName: deliveryNoteBucketName,
+      objectKey: `DN/${order.deliveryNote}`,
+      responseDisposition: `attachment; filename="${order.deliveryNote}"`
+    });
+  },
+
+  async createDeliveryNote(orderId: string) {
+    const orderWithItems = await this.getOrderWithItems(orderId);
+    if (!orderWithItems) {
+      return undefined;
+    }
+
+    const { order, orderItems } = orderWithItems;
+    if (!order.completedAt || order.cancelledAt) {
+      throw new BadRequestError('สามารถสร้างใบส่งของได้เฉพาะคำสั่งซื้อที่เสร็จสิ้นแล้วเท่านั้น');
+    }
+    if (orderItems.length === 0) {
+      throw new BadRequestError('คำสั่งซื้อต้องมีอย่างน้อย 1 รายการ');
+    }
+
+    const updatedOrder = await upsertDeliveryNoteForOrder(order, orderItems);
+    return { order: updatedOrder, orderItems };
+  },
+
+  async updateOrder(id: string, input: Partial<CreateOrderInput>, session?: ClientSession) {
     const run = async (activeSession?: ClientSession) => {
-      const order = await orderRepository.update(id, input, activeSession);
-      if (!order) {
+      const existingOrder = await orderRepository.findById(id, activeSession);
+      if (!existingOrder) {
         return undefined;
       }
 
-      await creditService.updateCreditFromOrder(order.id, input, activeSession);
-      return order;
+      if (existingOrder.completedAt) {
+        throw new BadRequestError('ไม่สามารถแก้ไขคำสั่งซื้อที่เสร็จสิ้นแล้วได้');
+      }
+
+      const nextStatus = input.status ?? getPersistedOrderStatus(existingOrder);
+      const nextLifecycle = getOrderLifecycleFields(nextStatus);
+      const nextCustomerId = input.customerId ?? existingOrder.customerId;
+      const customerSnapshot =
+        nextCustomerId === existingOrder.customerId
+          ? {
+              customerId: existingOrder.customerId,
+              customerBillName: existingOrder.customerBillName,
+              customerBillAddress: existingOrder.customerBillAddress
+            }
+          : await getCustomerBillingSnapshot(nextCustomerId, activeSession);
+      const nextDueDate = input.dueDate ?? existingOrder.dueDate;
+      const nextDeliveryDate = input.deliveryDate ?? existingOrder.deliveryDate;
+
+      let orderItems = input.items
+        ? await (async () => {
+            await orderItemRepository.removeByOrderId(id, activeSession);
+            return orderItemRepository.createMany(id, input.items!, nextLifecycle, activeSession);
+          })()
+        : await orderItemRepository.listByOrderId(id, activeSession);
+
+      if (orderItems.length === 0) {
+        throw new BadRequestError('คำสั่งซื้อต้องมีอย่างน้อย 1 รายการ');
+      }
+
+      if (!input.items && nextStatus === 'completed') {
+        orderItems = await orderItemRepository.updateLifecycleByOrderId(id, nextLifecycle, activeSession);
+      }
+
+      const totalAmount = orderItems.reduce((total, item) => total + item.lineTotal, 0);
+      const updatedOrder = await orderRepository.update(
+        id,
+        {
+          customerId: customerSnapshot.customerId,
+          customerBillName: customerSnapshot.customerBillName,
+          customerBillAddress: customerSnapshot.customerBillAddress,
+          totalAmount,
+          dueDate: nextDueDate,
+          deliveryDate: nextDeliveryDate,
+          completedAt: nextLifecycle.completedAt,
+          cancelledAt: nextLifecycle.cancelledAt
+        },
+        activeSession
+      );
+      if (!updatedOrder) {
+        throw new InternalServerError('ไม่พบคำสั่งซื้อหลังจากอัปเดต');
+      }
+
+      if (nextStatus === 'draft') {
+        return { order: updatedOrder, orderItems };
+      }
+
+      const existingCredit = await creditService.getCreditByOrderId(id, activeSession);
+      if (existingCredit) {
+        throw new BadRequestError('คำสั่งซื้อนี้ถูกสรุปแล้ว');
+      }
+
+      const credit = await creditService.createCreditForOrder({ ...updatedOrder, totalAmount }, activeSession);
+      const completedOrder = await upsertDeliveryNoteForOrder(updatedOrder, orderItems, activeSession);
+
+      return { order: completedOrder, orderItems, credit };
     };
 
     return session ? run(session) : runInTransaction(run);
   },
 
-  async updateOrderStatusFromCredit(orderId: number, status: CreditStatus, session?: ClientSession) {
+  async updateOrderStatusFromCredit(orderId: string, status: CreditStatus, session?: ClientSession) {
     const order = await orderRepository.findById(orderId, session);
-    if (!order || order.status === 'cancelled') {
+    if (!order || order.cancelledAt) {
       return order;
     }
 
-    return orderRepository.update(orderId, { status: mapOrderStatusFromCredit(status) }, session);
+    if (status === 'cancelled') {
+      return orderRepository.update(orderId, { cancelledAt: new Date() }, session);
+    }
+
+    if (status === 'paid') {
+      return orderRepository.update(orderId, { completedAt: order.completedAt ?? new Date() }, session);
+    }
+
+    return orderRepository.update(orderId, { completedAt: null, cancelledAt: null }, session);
   },
 
-  async resetOrderStatusAfterCreditRemoval(orderId: number, session?: ClientSession) {
+  async resetOrderStatusAfterCreditRemoval(orderId: string, session?: ClientSession) {
     const order = await orderRepository.findById(orderId, session);
     if (!order) {
       return undefined;
     }
-    if (order.status === 'cancelled') {
+    if (order.cancelledAt) {
       return order;
     }
 
-    return orderRepository.update(orderId, { status: 'pending' }, session);
+    return orderRepository.update(orderId, { completedAt: null, cancelledAt: null }, session);
   },
 
-  setOrderStatus(orderId: number, status: OrderStatus, session?: ClientSession) {
-    return orderRepository.update(orderId, { status }, session);
-  },
-
-  removeOrder(id: number) {
+  removeOrder(id: string) {
     return runInTransaction(async (session) => {
       const order = await orderRepository.remove(id, session);
       if (!order) {
         return undefined;
       }
 
-      const credits = await creditService.removeCreditsForOrder(order.id, session);
-      await Promise.all(credits.map((credit) => financeRepository.removeByCreditId(credit.id, session)));
-      return { order, credits };
+      const orderItems = await orderItemRepository.removeByOrderId(order._id.toString(), session);
+      const credits = await creditService.removeCreditsForOrder(order._id.toString(), session);
+      await Promise.all(credits.map((credit) => financeRepository.removeByCreditId(credit._id.toString(), session)));
+      return { order, orderItems, credits };
     });
   },
 
@@ -169,7 +382,7 @@ export const orderService = {
     const extracted = normalizeParsedOrder(parsed);
     const [matchedProduct, matchedCustomer] = await Promise.all([
       extracted.productName ? productRepository.findByProductName(extracted.productName) : Promise.resolve(null),
-      extracted.customerId
+      extracted.customerId && Types.ObjectId.isValid(extracted.customerId)
         ? customersRepository.findById(extracted.customerId)
         : extracted.customerName
           ? customersRepository.findByCustomerName(extracted.customerName)
@@ -185,9 +398,10 @@ export const orderService = {
         unit: extracted.unit ?? matchedProduct?.unit,
         buyPrice: extracted.buyPrice ?? matchedProduct?.defaultBuyPrice,
         sellPrice: extracted.sellPrice ?? matchedProduct?.sellPrice,
-        customerId: extracted.customerId ?? matchedCustomer?.customerId,
+        customerId: extracted.customerId ?? matchedCustomer?._id.toString(),
         dueDate: extracted.dueDate,
-        status: extracted.status ?? 'pending'
+        deliveryDate: extracted.dueDate,
+        status: extracted.status ?? 'draft'
       },
       matches: {
         product: matchedProduct
@@ -198,7 +412,7 @@ export const orderService = {
           : null,
         customer: matchedCustomer
           ? {
-              customerId: matchedCustomer.customerId,
+              _id: matchedCustomer._id.toString(),
               customerName: matchedCustomer.customerName
             }
           : null
@@ -226,11 +440,11 @@ export const orderService = {
       folderName,
       filenames: uploads.map((upload) => upload.filename),
       objectKeys: uploads.map((upload) => upload.objectKey),
-      createdAt: new Date().toISOString()
+      createdAt: new Date()
     });
 
     return {
-      requestId: batch.id,
+      requestId: batch._id.toString(),
       folderName: batch.folderName,
       createdAt: batch.createdAt,
       uploads
