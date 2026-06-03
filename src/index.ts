@@ -6,18 +6,15 @@ import { initiateDb } from './shared/persistence';
 const start = async () => {
   require('dotenv').config()
   loadExternalEnv();
+  await initiateDb();
 
   const restPort = Number(process.env.PORT || 8080);
   const restApp = createRestApp();
 
-  await new Promise<void>((resolve) => {
-    restApp.listen(restPort, () => {
-      logger.info({ port: restPort }, 'REST API server started');
-      resolve();
-    });
+  restApp.listen(restPort, () => {
+    logger.info({ port: restPort }, 'REST API server started');
   });
 
-  await initiateDb();
 };
 
 start().catch((error) => {
