@@ -28,4 +28,4 @@ jobs:
 
     - name: Submit Cloud Build
       run: |
-        gcloud builds submit --config=cloudbuild.yaml
+        gcloud builds submit --no-source --config=cloudbuild.yaml --substitutions=BRANCH_NAME=${GITHUB_REF_NAME},COMMIT_SHA=${GITHUB_SHA}

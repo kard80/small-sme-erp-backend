@@ -2,8 +2,18 @@ substitutions:
   _REGION: asia-southeast1
   _REPOSITORY: ekkalak-backend
   _SERVICE: ekkalak-backend
+  _REPO_URL: https://github.com/kard80/small-sme-erp-backend.git
 
 steps:
+  - id: clone
+    name: gcr.io/cloud-builders/git
+    args:
+      - clone
+      - --branch=$BRANCH_NAME
+      - --depth=1
+      - $_REPO_URL
+      - .
+
   - id: build
     name: gcr.io/cloud-builders/docker
     args:
