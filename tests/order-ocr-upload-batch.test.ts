@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { orderRepository } from '../src/modules/order/repository';
 import { orderOcrUploadBatchInputSchema } from '../src/modules/order/schemas';
@@ -37,15 +38,14 @@ describe('order OCR upload batch service', () => {
         }
       });
     vi.spyOn(orderRepository, 'createOcrUploadBatch').mockResolvedValue({
-      _id: {} as never,
-      id: 42,
+      _id: new Types.ObjectId(),
       folderName: '2026-06-02T03-04-05-678Z',
       filenames: ['invoice-1.jpg', 'invoice-2.png'],
       objectKeys: [
         'orders/ocr/2026-06-02T03-04-05-678Z/a.jpg',
         'orders/ocr/2026-06-02T03-04-05-678Z/b.png'
       ],
-      createdAt: '2026-06-02T03:04:05.678Z'
+      createdAt: new Date('2026-06-02T03:04:05.678Z')
     });
 
     const result = await orderService.createOcrUploadBatch(['invoice-1.jpg', 'invoice-2.png']);
@@ -65,12 +65,12 @@ describe('order OCR upload batch service', () => {
         'orders/ocr/2026-06-02T03-04-05-678Z/a.jpg',
         'orders/ocr/2026-06-02T03-04-05-678Z/b.png'
       ],
-      createdAt: '2026-06-02T03:04:05.678Z'
+      createdAt: new Date('2026-06-02T03:04:05.678Z')
     });
     expect(result).toEqual({
-      requestId: 42,
+      requestId: expect.any(String),
       folderName: '2026-06-02T03-04-05-678Z',
-      createdAt: '2026-06-02T03:04:05.678Z',
+      createdAt: new Date('2026-06-02T03:04:05.678Z'),
       uploads: [
         {
           filename: 'invoice-1.jpg',

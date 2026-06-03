@@ -67,6 +67,7 @@ describe('order OCR service', () => {
       customerId: undefined,
       customerName: 'Acme Co',
       dueDate: '2026-06-30',
+      deliveryDate: '2026-06-30',
       status: undefined,
       notes: ['customer name inferred from header']
     });
@@ -78,7 +79,8 @@ describe('order OCR service', () => {
       sellPrice: 150,
       customerId: 99,
       dueDate: '2026-06-30',
-      status: 'pending'
+      deliveryDate: '2026-06-30',
+      status: 'draft'
     });
     expect(result.matches.customer).toEqual({
       customerId: 99,
