@@ -14,9 +14,9 @@ const buildOrder = (overrides: Partial<Order> = {}): Order => {
     customerBillName: 'บริษัท ตัวอย่าง จำกัด',
     customerBillAddress: '99 ถนนสุขุมวิท แขวงคลองเตยเหนือ เขตวัฒนา กรุงเทพมหานคร 10110',
     totalAmount: 150,
-    dueDate: new Date('2026-06-30T00:00:00.000Z'),
-    deliveryDate: new Date('2026-06-20T00:00:00.000Z'),
-    createdAt: new Date('2026-06-01T00:00:00.000Z'),
+    dueDate: new Date('2026-06-30T00:00:00.000+07:00'),
+    deliveryDate: new Date('2026-06-20T00:00:00.000+07:00'),
+    createdAt: new Date('2026-06-01T00:00:00.000+07:00'),
     ...overrides
   };
 };

@@ -70,6 +70,6 @@ describeIfMongo('customer credit persistence', () => {
     expect(storedCredit?.customerId.toString()).toBe(customer.body._id);
     expect(storedCredit?.customerBillName).toBe('Mongo Credit Billing');
     expect(storedCredit?.deliveryNote).toBe('DN20260630');
-    expect(storedCredit?.dueDate).toEqual(new Date('2026-06-30T00:00:00.000Z'));
+    expect(storedCredit?.dueDate).toEqual(new Date('2026-06-30T00:00:00.000+07:00'));
   });
 });

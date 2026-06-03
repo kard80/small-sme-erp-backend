@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import moment from 'moment';
 import { Order, OrderItem } from '../../shared/types';
 
 const thaiMonthNames = [
@@ -41,9 +42,10 @@ export const formatThaiDate = (value?: Date | null) => {
     return '';
   }
 
-  const day = value.getUTCDate();
-  const month = thaiMonthNames[value.getUTCMonth()];
-  const year = value.getUTCFullYear() + 543;
+  const m = moment(value).utcOffset('+07:00');
+  const day = m.date();
+  const month = thaiMonthNames[m.month()];
+  const year = m.year() + 543;
   return `${day} ${month} ${year}`;
 };
 
