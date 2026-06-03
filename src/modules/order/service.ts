@@ -9,7 +9,7 @@ import { productRepository } from '../product/repository';
 import { CreateOrderInput, CreditStatus, Order } from '../../shared/types';
 import { BadRequestError, InternalServerError, NotFoundError } from '../../shared/errors';
 import { createSignedImageUploadUrl, createSignedObjectDownloadUrl, uploadObjectToBucket } from '../../shared/gcs';
-import { runInTransaction } from '../../shared/persistence';
+import { runInTransaction, withSession } from '../../shared/persistence';
 import { createOpenAiClient, getOpenAiModel } from '../../shared/openai';
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { OrderCreditPort } from './ports';
@@ -282,8 +282,8 @@ export const orderService = {
     return { order: updatedOrder, orderItems };
   },
 
-  async updateOrder(id: string, input: Partial<CreateOrderInput>, session?: ClientSession) {
-    const run = async (activeSession?: ClientSession) => {
+  updateOrder(id: string, input: Partial<CreateOrderInput>, session?: ClientSession) {
+    const run = async (activeSession: ClientSession) => {
       const existingOrder = await orderRepository.findById(id, activeSession);
       if (!existingOrder) {
         return undefined;
@@ -367,7 +367,7 @@ export const orderService = {
       return { order: completedOrder, orderItems, credit };
     };
 
-    return session ? run(session) : runInTransaction(run);
+    return withSession(session, run);
   },
 
   async updateOrderStatusFromCredit(orderId: string, status: CreditStatus, session?: ClientSession) {

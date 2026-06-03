@@ -177,6 +177,11 @@ export const assertDbReady = () => {
   }
 };
 
+export const withSession = <T>(
+  session: ClientSession | undefined,
+  work: (session: ClientSession) => Promise<T>
+): Promise<T> => (session ? work(session) : runInTransaction(work));
+
 export const runInTransaction = async <T>(work: (session: ClientSession) => Promise<T>) => {
   assertDbReady();
 

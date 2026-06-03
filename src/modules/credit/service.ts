@@ -1,6 +1,6 @@
 import { ClientSession } from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
-import { runInTransaction } from '../../shared/persistence';
+import { runInTransaction, withSession } from '../../shared/persistence';
 import { financeRepository } from '../finance/repository';
 import { CreditStatus, CustomerCredit, EntityPatch, NewEntity } from '../../shared/types';
 import { creditRepository } from './repository';
@@ -143,7 +143,7 @@ export const creditService = {
   },
 
   removeCustomerCredit(_id: string, session?: ClientSession) {
-    const run = async (activeSession?: ClientSession) => {
+    return withSession(session, async (activeSession) => {
       const removed = await creditRepository.remove(_id, activeSession);
       if (!removed) {
         return undefined;
@@ -151,9 +151,7 @@ export const creditService = {
 
       await financeRepository.removeByCreditId(removed._id.toString(), activeSession);
       return removed;
-    };
-
-    return session ? run(session) : runInTransaction(run);
+    });
   },
 
   removeCreditsForOrder(orderId: string, session?: ClientSession) {
