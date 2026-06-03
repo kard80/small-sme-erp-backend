@@ -1,4 +1,4 @@
-import { ClientSession } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { runInTransaction, withSession } from '../../shared/persistence';
 import { financeRepository } from '../finance/repository';
@@ -27,7 +27,7 @@ export const creditService = {
   },
 
   createCreditForOrder(order: {
-    _id: { toString(): string };
+    _id: Types.ObjectId;
     customerId: string;
     customerBillName: string;
     dueDate: Date;
@@ -38,8 +38,8 @@ export const creditService = {
   }, session?: ClientSession) {
     const status: CreditStatus = order.cancelledAt ? 'cancelled' : 'pending';
     return creditRepository.create({
-      orderId: order._id.toString(),
-      customerId: order.customerId,
+      orderId: order._id,
+      customerId: new Types.ObjectId(order.customerId),
       deliveryNote: order.deliveryNote,
       customerBillName: order.customerBillName,
       dueDate: order.dueDate,
@@ -91,7 +91,7 @@ export const creditService = {
     return creditRepository.update(credit._id.toString(), {
       totalAmount,
       paidAmount,
-      customerId: typeof input.customerId === 'string' ? input.customerId : credit.customerId,
+      customerId: input.customerId ? new Types.ObjectId(input.customerId) : credit.customerId,
       customerBillName: typeof input.customerBillName === 'string' ? input.customerBillName : credit.customerBillName,
       dueDate: input.dueDate ?? credit.dueDate,
       deliveryNote: input.deliveryNote ?? credit.deliveryNote,

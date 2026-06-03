@@ -6,8 +6,8 @@ import { pickDefined } from '../../shared/utils';
 const toObjectId = (value: string | Types.ObjectId) => (value instanceof Types.ObjectId ? value : new Types.ObjectId(value));
 
 const toCustomerCreditCreateDoc = (input: NewEntity<CustomerCredit, never>) => ({
-  orderId: toObjectId(input.orderId),
-  customerId: toObjectId(input.customerId),
+  orderId: input.orderId,
+  customerId: input.customerId,
   deliveryNote: input.deliveryNote,
   customerBillName: input.customerBillName,
   dueDate: input.dueDate,
@@ -16,12 +16,7 @@ const toCustomerCreditCreateDoc = (input: NewEntity<CustomerCredit, never>) => (
   status: input.status
 });
 
-const toCustomerCreditUpdateDoc = (input: EntityPatch<CustomerCredit, never>) => {
-  const update = pickDefined(input);
-  if (update.orderId !== undefined) update.orderId = toObjectId(update.orderId);
-  if (update.customerId !== undefined) update.customerId = toObjectId(update.customerId);
-  return update;
-};
+const toCustomerCreditUpdateDoc = (input: EntityPatch<CustomerCredit, never>) => pickDefined(input);
 
 export const creditRepository = {
   async create(input: NewEntity<CustomerCredit, never>, session?: ClientSession) {

@@ -54,8 +54,8 @@ export interface OrderItem extends MongoEntity {
 }
 
 export interface CustomerCredit extends MongoEntity {
-  orderId: Types.ObjectId | string;
-  customerId: Types.ObjectId | string;
+  orderId: Types.ObjectId;
+  customerId: Types.ObjectId;
   deliveryNote?: string;
   customerBillName: string;
   dueDate: Date;
