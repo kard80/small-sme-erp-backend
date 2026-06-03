@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
-import { parseObjectIdParam, paginationSchema } from '../../shared/http';
+import { parseObjectIdParam, paginationSchema, sendZodError } from '../../shared/http';
 import { orderImageOcrInputSchema, orderInputSchema, orderOcrUploadBatchInputSchema, orderUpdateSchema } from './schemas';
 import { orderService } from './service';
 
@@ -10,7 +10,7 @@ export const createOrderRouter = () => {
   router.post('/', async (req, res) => {
     const input = orderInputSchema.safeParse(req.body);
     if (!input.success) {
-      return res.status(400).json({ error: input.error.flatten() });
+      return sendZodError(res, input.error);
     }
 
     return res.status(201).json(await orderService.createOrder(input.data));
@@ -19,7 +19,7 @@ export const createOrderRouter = () => {
   router.get('/', async (req, res) => {
     const parsed = paginationSchema.safeParse(req.query);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.flatten() });
+      return sendZodError(res, parsed.error);
     }
 
     return res.json(await orderService.listOrders(parsed.data.page, parsed.data.pageSize));
@@ -65,7 +65,7 @@ export const createOrderRouter = () => {
   router.post('/ocr', async (req, res) => {
     const input = orderImageOcrInputSchema.safeParse(req.body);
     if (!input.success) {
-      return res.status(400).json({ error: input.error.flatten() });
+      return sendZodError(res, input.error);
     }
 
     return res.json(await orderService.parseOrderImageUrls(input.data.imageUrls));
@@ -74,7 +74,7 @@ export const createOrderRouter = () => {
   router.post('/ocr/upload', async (req, res) => {
     const input = orderOcrUploadBatchInputSchema.safeParse(req.body);
     if (!input.success) {
-      return res.status(400).json({ error: input.error.flatten() });
+      return sendZodError(res, input.error);
     }
 
     return res.status(201).json(await orderService.createOcrUploadBatch(input.data.filenames));
@@ -87,7 +87,7 @@ export const createOrderRouter = () => {
       return;
     }
     if (!input.success) {
-      return res.status(400).json({ error: 'คำขอไม่ถูกต้อง' });
+      return sendZodError(res, input.error);
     }
 
     const order = await orderService.updateOrder(id, input.data);
