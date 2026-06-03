@@ -6,3 +6,9 @@ export const paymentSchema = z.object({
   paymentDate: z.coerce.date().default(() => new Date()),
   note: z.string().optional()
 });
+
+export const creditPaymentSchema = z.object({
+  amount: z.coerce.number().positive(),
+  paymentDate: z.coerce.date().default(() => new Date()),
+  note: z.string().trim().optional()
+});

@@ -1,15 +1,17 @@
 import { Router } from 'express';
 import { orderService } from '../order/service';
 import { InternalServerError } from '../../shared/errors';
-import { parseObjectIdParam } from '../../shared/http';
+import { paginationSchema, parseObjectIdParam } from '../../shared/http';
 import { runInTransaction } from '../../shared/persistence';
+import { financeService } from '../finance/service';
+import { creditPaymentSchema } from '../finance/schemas';
 import { customerCreditSchema, customerCreditUpdateSchema } from './schemas';
 import { creditService } from './service';
 
 export const createCreditRouter = () => {
   const router = Router();
 
-  router.post('/customer-credits', async (req, res) => {
+  router.post('/', async (req, res) => {
     const input = customerCreditSchema.safeParse(req.body);
     if (!input.success) {
       return res.status(400).json({ error: input.error.flatten() });
@@ -18,8 +20,13 @@ export const createCreditRouter = () => {
     return res.status(201).json(await creditService.createCustomerCredit(input.data));
   });
 
-  router.get('/', async (_req, res) => {
-    return res.json(await creditService.listCustomerCredits());
+  router.get('/', async (req, res) => {
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() });
+    }
+
+    return res.json(await creditService.listCustomerCredits(parsed.data.page, parsed.data.pageSize));
   });
 
   router.get('/:id', async (req, res) => {
@@ -34,6 +41,21 @@ export const createCreditRouter = () => {
     }
 
     return res.json(credit);
+  });
+
+  router.post('/:id/payments', async (req, res) => {
+    const id = parseObjectIdParam(req, res, 'เครดิตลูกค้า');
+    if (id === undefined) {
+      return;
+    }
+
+    const input = creditPaymentSchema.safeParse(req.body);
+    if (!input.success) {
+      return res.status(400).json({ error: input.error.flatten() });
+    }
+
+    const payment = await financeService.applyPayment({ customerCreditId: id, ...input.data });
+    return res.status(201).json(payment);
   });
 
   router.patch('/:id', async (req, res) => {
