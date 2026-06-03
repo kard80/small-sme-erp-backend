@@ -1,45 +1,34 @@
 import { ClientSession } from 'mongoose';
-import {
-  PaymentTransactionModel,
-  nextSequence
-} from '../../shared/persistence';
+import { PaymentTransactionModel } from '../../shared/persistence';
 import { NewEntity, PaymentTransaction } from '../../shared/types';
 
 export const financeRepository = {
-  async create(input: NewEntity<PaymentTransaction, 'id'>, session?: ClientSession) {
-    const [payment] = await PaymentTransactionModel.create(
-      [
-        {
-          id: await nextSequence('financials', session),
-          ...input
-        }
-      ],
-      { session }
-    );
+  async create(input: NewEntity<PaymentTransaction, never>, session?: ClientSession) {
+    const [payment] = await PaymentTransactionModel.create([input], { session });
     return payment.toObject();
   },
 
   list() {
-    return PaymentTransactionModel.find().sort({ id: 1 }).lean<PaymentTransaction[]>();
+    return PaymentTransactionModel.find().sort({ _id: 1 }).lean<PaymentTransaction[]>();
   },
 
-  findById(id: number, session?: ClientSession) {
-    return PaymentTransactionModel.findOne({ id }).session(session ?? null).lean<PaymentTransaction | null>();
+  findById(_id: string, session?: ClientSession) {
+    return PaymentTransactionModel.findOne({ _id }).session(session ?? null).lean<PaymentTransaction | null>();
   },
 
-  update(id: number, input: NewEntity<PaymentTransaction, 'id'>, session?: ClientSession) {
+  update(_id: string, input: NewEntity<PaymentTransaction, never>, session?: ClientSession) {
     return PaymentTransactionModel.findOneAndUpdate(
-      { id },
+      { _id },
       { $set: input },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).session(session ?? null).lean<PaymentTransaction | null>();
   },
 
-  remove(id: number, session?: ClientSession) {
-    return PaymentTransactionModel.findOneAndDelete({ id }).session(session ?? null).lean<PaymentTransaction | null>();
+  remove(_id: string, session?: ClientSession) {
+    return PaymentTransactionModel.findOneAndDelete({ _id }).session(session ?? null).lean<PaymentTransaction | null>();
   },
 
-  async removeByCreditId(customerCreditId: number, session?: ClientSession) {
+  async removeByCreditId(customerCreditId: string, session?: ClientSession) {
     await PaymentTransactionModel.deleteMany({ customerCreditId }).session(session ?? null);
   }
 };

@@ -4,8 +4,8 @@ import {
   Customer,
   CustomerCredit,
   Order,
+  OrderItem,
   OrderOcrUploadBatch,
-  OrderStatus,
   PaymentTransaction,
   Product,
   ProductStatus
@@ -13,112 +13,123 @@ import {
 
 mongoose.set('strictQuery', true);
 
+const baseSchemaFields = {
+  createdAt: { type: Date, required: true, default: Date.now }
+};
+
 const baseSchemaOptions = {
   strict: 'throw' as const,
   versionKey: false as const,
   minimize: false as const
 };
 
+const collectionNames = {
+  product: 'products',
+  customer: 'customers',
+  order: 'orders',
+  orderItem: 'order_items',
+  customerCredit: 'customer_credits',
+  paymentTransaction: 'payment_transactions',
+  orderOcrUploadBatch: 'order_ocr_upload_batches',
+  counter: 'counters'
+} as const;
+
+const createBaseSchema = <T>(definition: Record<string, unknown>) =>
+  new Schema<T>(
+    {
+      _id: { type: Schema.Types.ObjectId, auto: true },
+      ...baseSchemaFields,
+      ...definition
+    },
+    baseSchemaOptions
+  );
+
 const productStatusValues: ProductStatus[] = ['active', 'inactive'];
 
-const productSchema = new Schema<Product>(
-  {
-    _id: { type: Schema.Types.ObjectId, auto: true },
+const productSchema = createBaseSchema<Product>({
     productName: { type: String, required: true, trim: true },
     unit: { type: String, required: true, trim: true },
     defaultBuyPrice: { type: Number, required: false, min: 0 },
     sellPrice: { type: Number, required: true, min: 0 },
     status: { type: String, required: true, enum: productStatusValues, default: 'active' }
-  },
-  baseSchemaOptions
-);
+});
 
-const customerSchema = new Schema<Customer>(
-  {
-    _id: { type: Schema.Types.ObjectId, auto: true },
-    customerId: { type: Number, required: true, unique: true },
+const customerSchema = createBaseSchema<Customer>({
     customerName: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
     billName: { type: String, required: true, trim: true }
-  },
-  baseSchemaOptions
-);
+});
 
-const orderStatusValues: OrderStatus[] = ['pending', 'completed', 'cancelled'];
 const creditStatusValues: CreditStatus[] = ['pending', 'paid', 'cancelled'];
 
-const orderSchema = new Schema<Order>(
-  {
-    _id: { type: Schema.Types.ObjectId, auto: true },
-    id: { type: Number, required: true, unique: true },
-    productId: { type: String, required: true, index: true, trim: true },
-    productName: { type: String, required: true, trim: true },
-    unit: { type: String, required: true, trim: true },
-    buyPrice: { type: Number, required: true, min: 0 },
-    sellPrice: { type: Number, required: true, min: 0 },
-    customerId: { type: Number, required: true, index: true },
-    dueDate: { type: String, required: true },
-    status: { type: String, required: true, enum: orderStatusValues }
-  },
-  baseSchemaOptions
-);
+const orderSchema = createBaseSchema<Order>({
+    customerId: { type: String, required: true, index: true, trim: true },
+    customerBillName: { type: String, required: true, trim: true },
+    customerBillAddress: { type: String, required: true, trim: true },
+    totalAmount: { type: Number, required: true, min: 0 },
+    dueDate: { type: Date, required: true },
+    deliveryDate: { type: Date, required: true },
+    deliveryNote: { type: String, required: false, trim: true },
+    completedAt: { type: Date, required: false, default: null },
+    cancelledAt: { type: Date, required: false, default: null }
+});
 
-const customerCreditSchema = new Schema<CustomerCredit>(
-  {
-    _id: { type: Schema.Types.ObjectId, auto: true },
-    id: { type: Number, required: true, unique: true },
-    orderId: { type: Number, required: true, index: true },
-    customerId: { type: Number, required: true, index: true },
+const customerCreditSchema = createBaseSchema<CustomerCredit>({
+    orderId: { type: String, required: true, index: true, trim: true },
+    customerId: { type: String, required: true, index: true, trim: true },
     totalAmount: { type: Number, required: true, min: 0 },
     paidAmount: { type: Number, required: true, min: 0 },
     status: { type: String, required: true, enum: creditStatusValues }
-  },
-  baseSchemaOptions
-);
+});
 
-const paymentTransactionSchema = new Schema<PaymentTransaction>(
-  {
-    _id: { type: Schema.Types.ObjectId, auto: true },
-    id: { type: Number, required: true, unique: true },
-    customerCreditId: { type: Number, required: true, index: true },
+const orderItemSchema = createBaseSchema<OrderItem>({
+    orderId: { type: Schema.Types.ObjectId, required: true, index: true },
+    order: { type: Number, required: true, min: 1 },
+    productId: { type: Schema.Types.ObjectId, required: true, index: true },
+    productName: { type: String, required: true, trim: true },
+    unit: { type: String, required: true, trim: true },
+    quantity: { type: Number, required: true, min: 0 },
+    buyPrice: { type: Number, required: true, min: 0 },
+    sellPrice: { type: Number, required: true, min: 0 },
+    lineTotal: { type: Number, required: true, min: 0 },
+    completedAt: { type: Date, required: false, default: null },
+    cancelledAt: { type: Date, required: false, default: null }
+});
+
+const paymentTransactionSchema = createBaseSchema<PaymentTransaction>({
+    customerCreditId: { type: String, required: true, index: true, trim: true },
     amount: { type: Number, required: true, min: 0 },
-    paymentDate: { type: String, required: true },
+    paymentDate: { type: Date, required: true },
     note: { type: String, required: false, trim: true }
-  },
-  baseSchemaOptions
-);
+});
 
-const orderOcrUploadBatchSchema = new Schema<OrderOcrUploadBatch>(
-  {
-    _id: { type: Schema.Types.ObjectId, auto: true },
-    id: { type: Number, required: true, unique: true },
+const orderOcrUploadBatchSchema = createBaseSchema<OrderOcrUploadBatch>({
     folderName: { type: String, required: true, trim: true },
     filenames: { type: [String], required: true },
     objectKeys: { type: [String], required: true },
-    createdAt: { type: String, required: true }
-  },
-  baseSchemaOptions
-);
+    createdAt: { type: Date, required: true }
+});
 
-const counterSchema = new Schema(
-  {
-    _id: { type: Schema.Types.ObjectId, auto: true },
+const counterSchema = createBaseSchema({
     key: { type: String, required: true, unique: true },
     value: { type: Number, required: true, default: 0 }
-  },
-  baseSchemaOptions
-);
+});
 
-export const ProductModel = models.Product || model<Product>('Product', productSchema);
-export const CustomerModel = models.Customer || model<Customer>('Customer', customerSchema);
-export const OrderModel = models.Order || model<Order>('Order', orderSchema);
+export const ProductModel = models.Product || model<Product>('Product', productSchema, collectionNames.product);
+export const CustomerModel = models.Customer || model<Customer>('Customer', customerSchema, collectionNames.customer);
+export const OrderModel = models.Order || model<Order>('Order', orderSchema, collectionNames.order);
+export const OrderItemModel =
+  models.OrderItem || model<OrderItem>('OrderItem', orderItemSchema, collectionNames.orderItem);
 export const CustomerCreditModel =
-  models.CustomerCredit || model<CustomerCredit>('CustomerCredit', customerCreditSchema);
+  models.CustomerCredit ||
+  model<CustomerCredit>('CustomerCredit', customerCreditSchema, collectionNames.customerCredit);
 export const PaymentTransactionModel =
-  models.PaymentTransaction || model<PaymentTransaction>('PaymentTransaction', paymentTransactionSchema);
+  models.PaymentTransaction ||
+  model<PaymentTransaction>('PaymentTransaction', paymentTransactionSchema, collectionNames.paymentTransaction);
 export const OrderOcrUploadBatchModel =
-  models.OrderOcrUploadBatch || model<OrderOcrUploadBatch>('OrderOcrUploadBatch', orderOcrUploadBatchSchema);
-const CounterModel = models.Counter || model('Counter', counterSchema);
+  models.OrderOcrUploadBatch ||
+  model<OrderOcrUploadBatch>('OrderOcrUploadBatch', orderOcrUploadBatchSchema, collectionNames.orderOcrUploadBatch);
+const CounterModel = models.Counter || model('Counter', counterSchema, collectionNames.counter);
 
 let initPromise: Promise<void> | undefined;
 
@@ -179,7 +190,7 @@ export const nextSequence = async (key: string, session?: ClientSession) => {
     { key },
     { $inc: { value: 1 } },
     {
-      new: true,
+      returnDocument: 'after',
       upsert: true,
       setDefaultsOnInsert: true
     }

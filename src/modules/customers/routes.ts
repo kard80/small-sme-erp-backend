@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { parseIdParam } from '../../shared/http';
+import { paginationSchema, parseObjectIdParam } from '../../shared/http';
 import { customerSchema, customerUpdateSchema } from './schemas';
 import { customersService } from './service';
 
@@ -15,12 +15,17 @@ export const createCustomersRouter = () => {
     return res.status(201).json(await customersService.createCustomer(input.data));
   });
 
-  router.get('/', async (_req, res) => {
-    return res.json(await customersService.listCustomers());
+  router.get('/', async (req, res) => {
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() });
+    }
+
+    return res.json(await customersService.listCustomers(parsed.data.page, parsed.data.pageSize));
   });
 
   router.get('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'ลูกค้า');
+    const id = parseObjectIdParam(req, res, 'ลูกค้า');
     if (id === undefined) {
       return;
     }
@@ -34,7 +39,7 @@ export const createCustomersRouter = () => {
   });
 
   router.patch('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'ลูกค้า');
+    const id = parseObjectIdParam(req, res, 'ลูกค้า');
     const input = customerUpdateSchema.safeParse(req.body);
     if (id === undefined) {
       return;
@@ -52,7 +57,7 @@ export const createCustomersRouter = () => {
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'ลูกค้า');
+    const id = parseObjectIdParam(req, res, 'ลูกค้า');
     if (id === undefined) {
       return;
     }

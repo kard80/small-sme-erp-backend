@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { orderService } from '../order/service';
 import { InternalServerError } from '../../shared/errors';
-import { parseIdParam } from '../../shared/http';
+import { parseObjectIdParam } from '../../shared/http';
 import { runInTransaction } from '../../shared/persistence';
 import { customerCreditSchema, customerCreditUpdateSchema } from './schemas';
 import { creditService } from './service';
@@ -23,7 +23,7 @@ export const createCreditRouter = () => {
   });
 
   router.get('/customer-credits/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'เครดิตลูกค้า');
+    const id = parseObjectIdParam(req, res, 'เครดิตลูกค้า');
     if (id === undefined) {
       return;
     }
@@ -37,7 +37,7 @@ export const createCreditRouter = () => {
   });
 
   router.patch('/customer-credits/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'เครดิตลูกค้า');
+    const id = parseObjectIdParam(req, res, 'เครดิตลูกค้า');
     const input = customerCreditUpdateSchema.safeParse(req.body);
     if (id === undefined) {
       return;
@@ -68,7 +68,7 @@ export const createCreditRouter = () => {
   });
 
   router.delete('/customer-credits/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'เครดิตลูกค้า');
+    const id = parseObjectIdParam(req, res, 'เครดิตลูกค้า');
     if (id === undefined) {
       return;
     }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { parseIdParam } from '../../shared/http';
+import { parseObjectIdParam } from '../../shared/http';
 import { paymentSchema } from './schemas';
 import { financeService } from './service';
 
@@ -20,7 +20,7 @@ export const createFinanceRouter = () => {
   });
 
   router.get('/payments/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'รายการชำระเงิน');
+    const id = parseObjectIdParam(req, res, 'รายการชำระเงิน');
     if (id === undefined) {
       return;
     }
@@ -34,7 +34,7 @@ export const createFinanceRouter = () => {
   });
 
   router.patch('/payments/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'รายการชำระเงิน');
+    const id = parseObjectIdParam(req, res, 'รายการชำระเงิน');
     const input = paymentSchema.safeParse(req.body);
     if (id === undefined) {
       return;
@@ -47,7 +47,7 @@ export const createFinanceRouter = () => {
   });
 
   router.delete('/payments/:id', async (req, res) => {
-    const id = parseIdParam(req, res, 'รายการชำระเงิน');
+    const id = parseObjectIdParam(req, res, 'รายการชำระเงิน');
     if (id === undefined) {
       return;
     }

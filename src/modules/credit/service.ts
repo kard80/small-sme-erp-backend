@@ -2,7 +2,7 @@ import { ClientSession } from 'mongoose';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { runInTransaction } from '../../shared/persistence';
 import { financeRepository } from '../finance/repository';
-import { CreditStatus, CustomerCredit, EntityPatch, NewEntity, OrderStatus } from '../../shared/types';
+import { CreditStatus, CustomerCredit, EntityPatch, NewEntity } from '../../shared/types';
 import { creditRepository } from './repository';
 
 export const normalizeCreditStatus = (credit: CustomerCredit): CreditStatus => {
@@ -13,32 +13,24 @@ export const normalizeCreditStatus = (credit: CustomerCredit): CreditStatus => {
   return credit.paidAmount >= credit.totalAmount ? 'paid' : 'pending';
 };
 
-export const mapOrderStatusFromCredit = (status: CreditStatus): OrderStatus => {
-  if (status === 'cancelled') {
-    return 'cancelled';
-  }
-
-  return status === 'paid' ? 'completed' : 'pending';
-};
-
 export const creditService = {
-  createCustomerCredit(input: NewEntity<CustomerCredit, 'id'>) {
+  createCustomerCredit(input: NewEntity<CustomerCredit, never>) {
     return creditRepository.create(input);
   },
 
   createCreditForOrder(order: {
-    id: number;
-    customerId: number;
-    sellPrice: number;
-    status: OrderStatus;
+    _id: { toString(): string };
+    customerId: string;
+    totalAmount: number;
+    completedAt?: Date | null;
+    cancelledAt?: Date | null;
   }, session?: ClientSession) {
-    const status: CreditStatus =
-      order.status === 'cancelled' ? 'cancelled' : order.status === 'completed' ? 'paid' : 'pending';
-    const paidAmount = status === 'paid' ? order.sellPrice : 0;
+    const status: CreditStatus = order.cancelledAt ? 'cancelled' : order.completedAt ? 'paid' : 'pending';
+    const paidAmount = status === 'paid' ? order.totalAmount : 0;
     return creditRepository.create({
-      orderId: order.id,
+      orderId: order._id.toString(),
       customerId: order.customerId,
-      totalAmount: order.sellPrice,
+      totalAmount: order.totalAmount,
       paidAmount,
       status
     }, session);
@@ -48,17 +40,17 @@ export const creditService = {
     return creditRepository.list();
   },
 
-  getCustomerCredit(id: number, session?: ClientSession) {
-    return creditRepository.findById(id, session);
+  getCustomerCredit(_id: string, session?: ClientSession) {
+    return creditRepository.findById(_id, session);
   },
 
-  getCreditByOrderId(orderId: number, session?: ClientSession) {
+  getCreditByOrderId(orderId: string, session?: ClientSession) {
     return creditRepository.findByOrderId(orderId, session);
   },
 
   async updateCreditFromOrder(
-    orderId: number,
-    input: { sellPrice?: number; customerId?: number; status?: OrderStatus },
+    orderId: string,
+    input: { sellPrice?: number; customerId?: string; completedAt?: string | null; cancelledAt?: string | null },
     session?: ClientSession
   ) {
     const credit = await creditRepository.findByOrderId(orderId, session);
@@ -67,32 +59,36 @@ export const creditService = {
     }
 
     const totalAmount = typeof input.sellPrice === 'number' ? input.sellPrice : credit.totalAmount;
-    const paidAmount = input.status === 'completed' ? totalAmount : Math.min(credit.paidAmount, totalAmount);
+    const paidAmount = input.completedAt ? totalAmount : Math.min(credit.paidAmount, totalAmount);
     const status =
-      input.status === 'completed'
+      input.completedAt
         ? 'paid'
-        : input.status === 'cancelled'
+        : input.cancelledAt
           ? 'cancelled'
           : normalizeCreditStatus({ ...credit, totalAmount, paidAmount, status: credit.status });
 
-    return creditRepository.update(credit.id, {
+    return creditRepository.update(credit._id.toString(), {
       totalAmount,
       paidAmount,
-      customerId: typeof input.customerId === 'number' ? input.customerId : credit.customerId,
+      customerId: typeof input.customerId === 'string' ? input.customerId : credit.customerId,
       status
     }, session);
   },
 
-  async updateCustomerCredit(id: number, input: EntityPatch<CustomerCredit, 'id'>, session?: ClientSession) {
-    const existing = await creditRepository.findById(id, session);
+  async updateCustomerCredit(_id: string, input: EntityPatch<CustomerCredit, never>, session?: ClientSession) {
+    const existing = await creditRepository.findById(_id, session);
     if (!existing) {
       return undefined;
     }
 
-    const credit = await creditRepository.update(id, {
-      ...input,
-      status: normalizeCreditStatus({ ...existing, ...input, id: existing.id })
-    }, session);
+    const credit = await creditRepository.update(
+      _id,
+      {
+        ...input,
+        status: normalizeCreditStatus({ ...existing, ...input })
+      },
+      session
+    );
     if (!credit) {
       return undefined;
     }
@@ -100,8 +96,8 @@ export const creditService = {
     return credit;
   },
 
-  async adjustPaidAmount(id: number, delta: number, session?: ClientSession) {
-    const credit = await creditRepository.findById(id, session);
+  async adjustPaidAmount(_id: string, delta: number, session?: ClientSession) {
+    const credit = await creditRepository.findById(_id, session);
     if (!credit) {
       throw new NotFoundError('ไม่พบเครดิตลูกค้า');
     }
@@ -111,27 +107,27 @@ export const creditService = {
     }
 
     const paidAmount = Math.max(0, credit.paidAmount + delta);
-    return creditRepository.update(id, {
+    return creditRepository.update(_id, {
       paidAmount,
       status: normalizeCreditStatus({ ...credit, paidAmount })
     }, session);
   },
 
-  removeCustomerCredit(id: number, session?: ClientSession) {
+  removeCustomerCredit(_id: string, session?: ClientSession) {
     const run = async (activeSession?: ClientSession) => {
-      const removed = await creditRepository.remove(id, activeSession);
+      const removed = await creditRepository.remove(_id, activeSession);
       if (!removed) {
         return undefined;
       }
 
-      await financeRepository.removeByCreditId(removed.id, activeSession);
+      await financeRepository.removeByCreditId(removed._id.toString(), activeSession);
       return removed;
     };
 
     return session ? run(session) : runInTransaction(run);
   },
 
-  removeCreditsForOrder(orderId: number, session?: ClientSession) {
+  removeCreditsForOrder(orderId: string, session?: ClientSession) {
     return creditRepository.removeByOrderId(orderId, session);
   }
 };

@@ -6,7 +6,7 @@ import { runInTransaction } from '../../shared/persistence';
 import { NewEntity, PaymentTransaction } from '../../shared/types';
 import { financeRepository } from './repository';
 
-const syncOrderFromCredit = async (customerCreditId: number, session?: ClientSession) => {
+const syncOrderFromCredit = async (customerCreditId: string, session?: ClientSession) => {
   const credit = await creditService.getCustomerCredit(customerCreditId, session);
   if (credit) {
     await orderService.updateOrderStatusFromCredit(credit.orderId, credit.status, session);
@@ -14,7 +14,7 @@ const syncOrderFromCredit = async (customerCreditId: number, session?: ClientSes
 };
 
 export const financeService = {
-  applyPayment(input: NewEntity<PaymentTransaction, 'id'>) {
+  applyPayment(input: NewEntity<PaymentTransaction, never>) {
     return runInTransaction(async (session) => {
       const credit = await creditService.getCustomerCredit(input.customerCreditId, session);
       if (!credit) {
@@ -35,13 +35,13 @@ export const financeService = {
     return financeRepository.list();
   },
 
-  getPayment(id: number) {
-    return financeRepository.findById(id);
+  getPayment(_id: string) {
+    return financeRepository.findById(_id);
   },
 
-  replacePayment(id: number, nextInput: NewEntity<PaymentTransaction, 'id'>) {
+  replacePayment(_id: string, nextInput: NewEntity<PaymentTransaction, never>) {
     return runInTransaction(async (session) => {
-      const previous = await financeRepository.findById(id, session);
+      const previous = await financeRepository.findById(_id, session);
       if (!previous) {
         throw new NotFoundError('ไม่พบธุรกรรมการเงิน');
       }
@@ -57,7 +57,7 @@ export const financeService = {
       await creditService.adjustPaidAmount(previous.customerCreditId, -previous.amount, session);
       await syncOrderFromCredit(previous.customerCreditId, session);
 
-      const updated = await financeRepository.update(id, nextInput, session);
+      const updated = await financeRepository.update(_id, nextInput, session);
       if (!updated) {
         throw new NotFoundError('ไม่พบธุรกรรมการเงิน');
       }
@@ -68,9 +68,9 @@ export const financeService = {
     });
   },
 
-  removePayment(id: number) {
+  removePayment(_id: string) {
     return runInTransaction(async (session) => {
-      const removed = await financeRepository.remove(id, session);
+      const removed = await financeRepository.remove(_id, session);
       if (!removed) {
         return false;
       }
@@ -81,7 +81,7 @@ export const financeService = {
     });
   },
 
-  removePaymentsForCredit(customerCreditId: number, session?: ClientSession) {
+  removePaymentsForCredit(customerCreditId: string, session?: ClientSession) {
     return financeRepository.removeByCreditId(customerCreditId, session);
   }
 };

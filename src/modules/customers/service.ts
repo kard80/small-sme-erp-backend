@@ -5,19 +5,19 @@ export const customersService = {
     return customersRepository.create(input);
   },
 
-  listCustomers() {
-    return customersRepository.list();
+  listCustomers(page: number, pageSize: number) {
+    return customersRepository.list(page, pageSize);
   },
 
-  getCustomer(id: number) {
-    return customersRepository.findById(id);
+  getCustomer(_id: string) {
+    return customersRepository.findById(_id);
   },
 
-  updateCustomer(id: number, input: Parameters<typeof customersRepository.update>[1]) {
-    return customersRepository.update(id, input);
+  updateCustomer(_id: string, input: Parameters<typeof customersRepository.update>[1]) {
+    return customersRepository.update(_id, input);
   },
 
-  removeCustomer(id: number) {
-    return customersRepository.remove(id);
+  removeCustomer(_id: string) {
+    return customersRepository.remove(_id);
   }
 };

@@ -63,7 +63,7 @@ export const productRepository = {
     return ProductModel.findOneAndUpdate(
       { _id },
       { $set: toProductUpdateDoc(input) },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     )
       .lean<Product | null>()
       .session(session ?? null);
