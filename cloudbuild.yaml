@@ -1,7 +1,7 @@
 substitutions:
   _REGION: asia-southeast1
-  _REPOSITORY: ekkalak-backend
-  _SERVICE: ekkalak-backend
+  _REPOSITORY: small-sme-erp-backend
+  _SERVICE: small-sme-erp-backend
   _REPO_URL: https://github.com/kard80/small-sme-erp-backend.git
 
 steps:
