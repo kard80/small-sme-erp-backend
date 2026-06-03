@@ -3,6 +3,9 @@ substitutions:
   _REPOSITORY: small-sme-erp-backend
   _SERVICE: small-sme-erp-backend
   _REPO_URL: https://github.com/kard80/small-sme-erp-backend.git
+  _MONGODB_URI: ''
+  _NODE_ENV: ''
+  _GCS_KEY_FILENAME: ''
 
 steps:
   - id: clone
@@ -43,6 +46,7 @@ steps:
       - --image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE:$COMMIT_SHA
       - --region=$_REGION
       - --platform=managed
+      - --set-env-vars=MONGODB_URI=$_MONGODB_URI,NODE_ENV=$_NODE_ENV,GCS_KEY_FILENAME=$_GCS_KEY_FILENAME
 
 images:
   - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE:$COMMIT_SHA
