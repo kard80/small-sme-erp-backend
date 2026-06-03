@@ -726,13 +726,13 @@ describeIfMongo('ERP backend', () => {
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(removed.status).toBe(204);
-    const [ordersCount, creditsCount, paymentsCount] = await Promise.all([
+    const [ordersCount, credit, paymentsCount] = await Promise.all([
       OrderModel.countDocuments(),
-      CustomerCreditModel.countDocuments(),
+      CustomerCreditModel.findOne({ _id: created.body.credit._id }).lean(),
       PaymentTransactionModel.countDocuments()
     ]);
     expect(ordersCount).toBe(0);
-    expect(creditsCount).toBe(0);
+    expect(credit?.deletedAt).toEqual(expect.any(Date));
     expect(paymentsCount).toBe(0);
   });
 

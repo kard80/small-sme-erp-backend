@@ -49,8 +49,8 @@ export const creditService = {
     }, session);
   },
 
-  listCustomerCredits() {
-    return creditRepository.list();
+  listCustomerCredits(page: number, pageSize: number) {
+    return creditRepository.list(page, pageSize);
   },
 
   getCustomerCredit(_id: string, session?: ClientSession) {
@@ -128,6 +128,11 @@ export const creditService = {
 
     if (credit.status === 'cancelled' && delta > 0) {
       throw new BadRequestError('ไม่สามารถชำระเครดิตลูกค้าที่ถูกยกเลิกได้');
+    }
+
+    const remaining = credit.totalAmount - credit.paidAmount;
+    if (delta > remaining) {
+      throw new BadRequestError('ยอดชำระเกินกว่ายอดค้างชำระ');
     }
 
     const paidAmount = Math.max(0, credit.paidAmount + delta);

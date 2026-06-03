@@ -7,6 +7,7 @@ export type CreateOrderStatus = 'draft' | 'completed';
 export interface MongoEntity {
   _id: Types.ObjectId;
   createdAt?: Date;
+  deletedAt?: Date | null;
 }
 
 export type NewEntity<T extends MongoEntity, GeneratedKey extends keyof T> = Omit<T, GeneratedKey | '_id'>;
