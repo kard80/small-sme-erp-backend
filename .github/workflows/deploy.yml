@@ -16,9 +16,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Create GCS key file
-      run: echo '${{ secrets.GCS_SERVICE_ACCOUNT }}' > ./gcs-key.json
-
     - id: auth
       name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
@@ -29,4 +26,4 @@ jobs:
     - name: Submit Cloud Build
       run: |
         gcloud builds submit --no-source --config=cloudbuild.yaml \
-          --substitutions=BRANCH_NAME=${GITHUB_REF_NAME},COMMIT_SHA=${GITHUB_SHA},_MONGODB_URI=${{ secrets.MONGODB_URI }},_NODE_ENV=${{ secrets.NODE_ENV }},_GCS_KEY_FILENAME=${{ secrets.GCS_KEY_FILENAME }}
+          --substitutions=BRANCH_NAME=${GITHUB_REF_NAME},COMMIT_SHA=${GITHUB_SHA},_MONGODB_URI=${{ secrets.MONGODB_URI }},_NODE_ENV=${{ secrets.NODE_ENV }}
