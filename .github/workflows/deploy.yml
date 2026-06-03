@@ -13,22 +13,20 @@ jobs:
       id-token: write
 
     steps:
-    - name: Create GCS key file
-      run: echo '${{ secrets.GCS_SERVICE_ACCOUNT }}' > ./gcs-key.json
-  
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Create GCS key file
+      run: echo '${{ secrets.GCS_SERVICE_ACCOUNT }}' > ./gcs-key.json
+
     # Reconstruct the JSON key file safely from the GitHub Secret
-    - name: Authenticate to Google Cloud
+    - id: auth
+      name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
       with:
         project_id: 'ekkalak'
         workload_identity_provider: 'projects/433818871135/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
         service_account: 'github-deployer@ekkalak.iam.gserviceaccount.com'
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Now you can run your Cloud Build or gcloud commands directly
     - name: Submit Cloud Build
