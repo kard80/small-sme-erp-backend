@@ -76,7 +76,7 @@ const orderSchema = createBaseSchema<Order>({
 
 const customerCreditSchema = createBaseSchema<CustomerCredit>({
     orderId: { type: String, required: true, index: true, trim: true },
-    customerId: { type: String, required: true, index: true, trim: true },
+    customerId: { type: Schema.Types.ObjectId, required: true, index: true },
     totalAmount: { type: Number, required: true, min: 0 },
     paidAmount: { type: Number, required: true, min: 0 },
     status: { type: String, required: true, enum: creditStatusValues }
