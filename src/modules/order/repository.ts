@@ -23,7 +23,7 @@ export const orderRepository = {
 
   async list(page: number, pageSize: number) {
     const [data, total] = await Promise.all([
-      OrderModel.find({ deletedAt: null }).sort({ _id: 1 }).skip((page - 1) * pageSize).limit(pageSize).lean<Order[]>(),
+      OrderModel.find({ deletedAt: null }).sort({ _id: -1 }).skip((page - 1) * pageSize).limit(pageSize).lean<Order[]>(),
       OrderModel.countDocuments({ deletedAt: null })
     ]);
 

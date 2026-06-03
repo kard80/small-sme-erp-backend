@@ -27,7 +27,7 @@ export const creditRepository = {
   async list(page: number, pageSize: number) {
     const [data, total] = await Promise.all([
       CustomerCreditModel.find({ deletedAt: null })
-        .sort({ _id: 1 })
+        .sort({ _id: -1 })
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .lean<CustomerCredit[]>(),
