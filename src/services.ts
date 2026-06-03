@@ -1,5 +1,8 @@
+import { orderCreditAdapter } from './modules/credit/order-credit.adapter';
 import { financeService } from './modules/finance/service';
-import { orderService } from './modules/order/service';
+import { configureOrderPorts, orderService } from './modules/order/service';
+
+configureOrderPorts({ credit: orderCreditAdapter });
 
 export const createOrderWithCredit = orderService.createOrder;
 export const applyFinancialTransaction = financeService.applyPayment;

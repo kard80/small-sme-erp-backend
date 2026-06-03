@@ -18,11 +18,11 @@ export const createCreditRouter = () => {
     return res.status(201).json(await creditService.createCustomerCredit(input.data));
   });
 
-  router.get('/customer-credits', async (_req, res) => {
+  router.get('/', async (_req, res) => {
     return res.json(await creditService.listCustomerCredits());
   });
 
-  router.get('/customer-credits/:id', async (req, res) => {
+  router.get('/:id', async (req, res) => {
     const id = parseObjectIdParam(req, res, 'เครดิตลูกค้า');
     if (id === undefined) {
       return;
@@ -36,7 +36,7 @@ export const createCreditRouter = () => {
     return res.json(credit);
   });
 
-  router.patch('/customer-credits/:id', async (req, res) => {
+  router.patch('/:id', async (req, res) => {
     const id = parseObjectIdParam(req, res, 'เครดิตลูกค้า');
     const input = customerCreditUpdateSchema.safeParse(req.body);
     if (id === undefined) {
@@ -52,7 +52,11 @@ export const createCreditRouter = () => {
         return undefined;
       }
 
-      const order = await orderService.updateOrderStatusFromCredit(updatedCredit.orderId, updatedCredit.status, session);
+      const order = await orderService.updateOrderStatusFromCredit(
+        updatedCredit.orderId.toString(),
+        updatedCredit.status,
+        session
+      );
       if (!order) {
         throw new InternalServerError('ไม่พบคำสั่งซื้อที่เชื่อมโยง');
       }
@@ -67,7 +71,7 @@ export const createCreditRouter = () => {
     return res.json(credit);
   });
 
-  router.delete('/customer-credits/:id', async (req, res) => {
+  router.delete('/:id', async (req, res) => {
     const id = parseObjectIdParam(req, res, 'เครดิตลูกค้า');
     if (id === undefined) {
       return;
@@ -79,7 +83,7 @@ export const createCreditRouter = () => {
         return undefined;
       }
 
-      const order = await orderService.resetOrderStatusAfterCreditRemoval(deletedCredit.orderId, session);
+      const order = await orderService.resetOrderStatusAfterCreditRemoval(deletedCredit.orderId.toString(), session);
       if (!order) {
         throw new InternalServerError('ไม่พบคำสั่งซื้อที่เชื่อมโยง');
       }

@@ -9,7 +9,7 @@ import { financeRepository } from './repository';
 const syncOrderFromCredit = async (customerCreditId: string, session?: ClientSession) => {
   const credit = await creditService.getCustomerCredit(customerCreditId, session);
   if (credit) {
-    await orderService.updateOrderStatusFromCredit(credit.orderId, credit.status, session);
+    await orderService.updateOrderStatusFromCredit(credit.orderId.toString(), credit.status, session);
   }
 };
 

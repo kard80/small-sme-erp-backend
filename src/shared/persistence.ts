@@ -60,7 +60,7 @@ const customerSchema = createBaseSchema<Customer>({
     billName: { type: String, required: true, trim: true }
 });
 
-const creditStatusValues: CreditStatus[] = ['pending', 'paid', 'cancelled'];
+const creditStatusValues: CreditStatus[] = ['pending', 'partial', 'paid', 'cancelled'];
 
 const orderSchema = createBaseSchema<Order>({
     customerId: { type: String, required: true, index: true, trim: true },
@@ -75,8 +75,11 @@ const orderSchema = createBaseSchema<Order>({
 });
 
 const customerCreditSchema = createBaseSchema<CustomerCredit>({
-    orderId: { type: String, required: true, index: true, trim: true },
+    orderId: { type: Schema.Types.ObjectId, required: true, index: true },
     customerId: { type: Schema.Types.ObjectId, required: true, index: true },
+    deliveryNote: { type: String, required: false, trim: true },
+    customerBillName: { type: String, required: true, trim: true },
+    dueDate: { type: Date, required: true },
     totalAmount: { type: Number, required: true, min: 0 },
     paidAmount: { type: Number, required: true, min: 0 },
     status: { type: String, required: true, enum: creditStatusValues }

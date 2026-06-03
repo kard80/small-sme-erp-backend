@@ -157,11 +157,14 @@ describeIfMongo('ERP backend', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.order.completedAt).toEqual(expect.any(String));
-    expect(response.body.order.deliveryNote).toMatch(/^DN\d{8}\.pdf$/);
+    expect(response.body.order.deliveryNote).toMatch(/^DN\d{8}$/);
     expect(response.body.orderItems).toHaveLength(1);
     expect(response.body.credit.totalAmount).toBe(150);
-    expect(response.body.credit.status).toBe('paid');
-    expect(response.body.credit.paidAmount).toBe(150);
+    expect(response.body.credit.customerBillName).toBe(response.body.order.customerBillName);
+    expect(response.body.credit.dueDate).toBe('2026-06-30');
+    expect(response.body.credit.deliveryNote).toBe(response.body.order.deliveryNote);
+    expect(response.body.credit.status).toBe('pending');
+    expect(response.body.credit.paidAmount).toBe(0);
     expect(response.body.deliveryNote).toBeUndefined();
   });
 
@@ -335,13 +338,16 @@ describeIfMongo('ERP backend', () => {
 
     expect(updated.status).toBe(200);
     expect(updated.body.order.completedAt).toEqual(expect.any(String));
-    expect(updated.body.order.deliveryNote).toMatch(/^DN\d{8}\.pdf$/);
+    expect(updated.body.order.deliveryNote).toMatch(/^DN\d{8}$/);
     expect(updated.body.orderItems).toHaveLength(1);
     expect(updated.body.orderItems[0].completedAt).toEqual(expect.any(String));
     expect(updated.body.credit).toMatchObject({
       totalAmount: 420,
-      paidAmount: 420,
-      status: 'paid'
+      paidAmount: 0,
+      status: 'pending',
+      customerBillName: updated.body.order.customerBillName,
+      dueDate: '2026-06-30',
+      deliveryNote: updated.body.order.deliveryNote
     });
     expect(updated.body.deliveryNote).toBeUndefined();
   });
@@ -378,7 +384,7 @@ describeIfMongo('ERP backend', () => {
 
     expect(completed.status).toBe(200);
     const originalFilename = completed.body.order.deliveryNote;
-    expect(originalFilename).toMatch(/^DN\d{8}\.pdf$/);
+    expect(originalFilename).toMatch(/^DN\d{8}$/);
 
     const removedDeliveryNote = await OrderModel.findOneAndUpdate(
       { _id: created.body.order._id },
@@ -394,7 +400,7 @@ describeIfMongo('ERP backend', () => {
       .send();
 
     expect(generated.status).toBe(201);
-    expect(generated.body.order.deliveryNote).toMatch(/^DN\d{8}\.pdf$/);
+    expect(generated.body.order.deliveryNote).toMatch(/^DN\d{8}$/);
     expect(generated.body.orderItems).toHaveLength(1);
 
     const replaced = await request(app)
@@ -609,8 +615,8 @@ describeIfMongo('ERP backend', () => {
     expect(response.status).toBe(201);
     expect(response.body.order.completedAt).toEqual(expect.any(String));
     expect(response.body.credit.totalAmount).toBe(225);
-    expect(response.body.credit.paidAmount).toBe(225);
-    expect(response.body.credit.status).toBe('paid');
+    expect(response.body.credit.paidAmount).toBe(0);
+    expect(response.body.credit.status).toBe('pending');
   });
 
   it('supports partial and full payment in financial transactions', async () => {
@@ -632,7 +638,7 @@ describeIfMongo('ERP backend', () => {
 
     expect(partial.status).toBe(201);
     const pendingCredit = await CustomerCreditModel.findOne({ _id: creditId }).lean();
-    expect(pendingCredit?.status).toBe('pending');
+    expect(pendingCredit?.status).toBe('partial');
     expect(pendingCredit?.paidAmount).toBe(50);
 
     const complete = await request(app)
@@ -739,7 +745,10 @@ describeIfMongo('ERP backend', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         orderId: new Types.ObjectId().toString(),
-        customerId: 99,
+        customerId: new Types.ObjectId().toString(),
+        customerBillName: 'Cancelled Credit Billing',
+        dueDate: '2026-06-30',
+        deliveryNote: 'DN20260630',
         totalAmount: 150,
         paidAmount: 0,
         status: 'cancelled'
@@ -793,7 +802,7 @@ describeIfMongo('ERP backend', () => {
       OrderModel.findOne({ _id: orderId }).lean()
     ]);
     expect(credit?.paidAmount).toBe(50);
-    expect(credit?.status).toBe('pending');
+    expect(credit?.status).toBe('partial');
     expect(order?.completedAt).toBeNull();
     expect(order?.cancelledAt).toBeNull();
 

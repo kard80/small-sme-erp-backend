@@ -6,12 +6,15 @@ import { requireAuth } from '../modules/auth/middleware';
 import { createAuthRouter } from '../modules/auth/routes';
 import { createProductRouter } from '../modules/product/routes';
 import { createCreditRouter } from '../modules/credit/routes';
+import { orderCreditAdapter } from '../modules/credit/order-credit.adapter';
 import { createCustomersRouter } from '../modules/customers/routes';
 import { createFinanceRouter } from '../modules/finance/routes';
 import { createOrderRouter } from '../modules/order/routes';
+import { configureOrderPorts } from '../modules/order/service';
 
 export const createRestApp = () => {
   assertDbReady();
+  configureOrderPorts({ credit: orderCreditAdapter });
 
   const app = express();
   const apiV1 = express.Router();

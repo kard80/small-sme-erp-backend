@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 
-export type CreditStatus = 'pending' | 'paid' | 'cancelled';
+export type CreditStatus = 'pending' | 'partial' | 'paid' | 'cancelled';
 export type ProductStatus = 'active' | 'inactive';
 export type CreateOrderStatus = 'draft' | 'completed';
 
@@ -53,8 +53,11 @@ export interface OrderItem extends MongoEntity {
 }
 
 export interface CustomerCredit extends MongoEntity {
-  orderId: string;
-  customerId: string;
+  orderId: Types.ObjectId | string;
+  customerId: Types.ObjectId | string;
+  deliveryNote?: string;
+  customerBillName: string;
+  dueDate: Date;
   totalAmount: number;
   paidAmount: number;
   status: CreditStatus;

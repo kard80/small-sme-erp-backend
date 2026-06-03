@@ -2,7 +2,6 @@ import { extname } from 'node:path';
 import { ClientSession, Types } from 'mongoose';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-import { creditService } from '../credit/service';
 import { customersRepository } from '../customers/repository';
 import { financeRepository } from '../finance/repository';
 import { orderItemRepository } from '../order-item/repository';
@@ -13,9 +12,23 @@ import { createSignedImageUploadUrl, createSignedObjectDownloadUrl, uploadObject
 import { runInTransaction } from '../../shared/persistence';
 import { createOpenAiClient, getOpenAiModel } from '../../shared/openai';
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
+import { OrderCreditPort } from './ports';
 import { orderRepository } from './repository';
 
 const deliveryNoteBucketName = 'correction-department-private';
+let orderCreditPort: OrderCreditPort | undefined;
+
+const getOrderCreditPort = () => {
+  if (!orderCreditPort) {
+    throw new InternalServerError('Order credit port has not been configured');
+  }
+
+  return orderCreditPort;
+};
+
+export const configureOrderPorts = (ports: { credit: OrderCreditPort }) => {
+  orderCreditPort = ports.credit;
+};
 
 const orderOcrSchema = z.object({
   productName: z.string().trim().min(1).nullable(),
@@ -119,13 +132,53 @@ const resolveOrderItems = (
 const getPersistedOrderStatus = (order: Pick<Order, 'completedAt'>): CreateOrderInput['status'] =>
   order.completedAt ? 'completed' : 'draft';
 
+const normalizeDeliveryNoteDocumentNumber = (deliveryNote?: string) => {
+  const value = deliveryNote?.trim();
+  if (!value) {
+    return undefined;
+  }
+
+  return value.replace(/\.pdf$/i, '');
+};
+
 const getDeliveryNoteDocumentNumber = async (order: Pick<Order, 'deliveryNote'>, session?: ClientSession) => {
-  const existingFilename = order.deliveryNote?.trim();
-  if (existingFilename) {
-    return existingFilename.replace(/\.pdf$/i, '');
+  const existingDocumentNumber = normalizeDeliveryNoteDocumentNumber(order.deliveryNote);
+  if (existingDocumentNumber) {
+    return existingDocumentNumber;
   }
 
   return generateDeliveryNoteNumber(session);
+};
+
+const createPreparedDeliveryNote = async (
+  order: Order,
+  orderItems: Awaited<ReturnType<typeof orderItemRepository.listByOrderId>>,
+  session?: ClientSession
+) => {
+  const documentNumber = await getDeliveryNoteDocumentNumber(order, session);
+  const pdf = await generateDeliveryNotePdfBuffer(order, orderItems, documentNumber);
+
+  return {
+    documentNumber,
+    pdf
+  };
+};
+
+const persistDeliveryNoteOnOrder = async (
+  order: Order,
+  documentNumber: string,
+  session?: ClientSession
+) => {
+  if (normalizeDeliveryNoteDocumentNumber(order.deliveryNote) === documentNumber) {
+    return order;
+  }
+
+  const updatedOrder = await orderRepository.update(order._id.toString(), { deliveryNote: documentNumber }, session);
+  if (!updatedOrder) {
+    throw new InternalServerError('ไม่พบคำสั่งซื้อหลังจากสร้างใบส่งของ');
+  }
+
+  return updatedOrder;
 };
 
 const upsertDeliveryNoteForOrder = async (
@@ -133,8 +186,7 @@ const upsertDeliveryNoteForOrder = async (
   orderItems: Awaited<ReturnType<typeof orderItemRepository.listByOrderId>>,
   session?: ClientSession
 ) => {
-  const documentNumber = await getDeliveryNoteDocumentNumber(order, session);
-  const deliveryNotePdf = await generateDeliveryNotePdfBuffer(order, orderItems, documentNumber);
+  const { documentNumber, pdf: deliveryNotePdf } = await createPreparedDeliveryNote(order, orderItems, session);
   await uploadObjectToBucket(
     deliveryNoteBucketName,
     `DN/${deliveryNotePdf.filename}`,
@@ -142,16 +194,7 @@ const upsertDeliveryNoteForOrder = async (
     deliveryNotePdf.contentType
   );
 
-  if (order.deliveryNote === deliveryNotePdf.filename) {
-    return order;
-  }
-
-  const updatedOrder = await orderRepository.update(order._id.toString(), { deliveryNote: deliveryNotePdf.filename }, session);
-  if (!updatedOrder) {
-    throw new InternalServerError('ไม่พบคำสั่งซื้อหลังจากสร้างใบส่งของ');
-  }
-
-  return updatedOrder;
+  return persistDeliveryNoteOnOrder(order, documentNumber, session);
 };
 
 export const orderService = {
@@ -165,8 +208,15 @@ export const orderService = {
         return { order, orderItems };
       }
 
-      const credit = await creditService.createCreditForOrder({ ...order, totalAmount }, session);
-      const updatedOrder = await upsertDeliveryNoteForOrder(order, orderItems, session);
+      const preparedDeliveryNote = await createPreparedDeliveryNote(order, orderItems, session);
+      const updatedOrder = await persistDeliveryNoteOnOrder(order, preparedDeliveryNote.documentNumber, session);
+      const credit = await getOrderCreditPort().createCreditForOrder({ ...updatedOrder, totalAmount }, session);
+      await uploadObjectToBucket(
+        deliveryNoteBucketName,
+        `DN/${preparedDeliveryNote.pdf.filename}`,
+        preparedDeliveryNote.pdf.bytes,
+        preparedDeliveryNote.pdf.contentType
+      );
 
       return { order: updatedOrder, orderItems, credit };
     });
@@ -202,10 +252,15 @@ export const orderService = {
       throw new NotFoundError('ไม่พบใบส่งของสำหรับคำสั่งซื้อนี้');
     }
 
+    const deliveryNoteDocumentNumber = normalizeDeliveryNoteDocumentNumber(order.deliveryNote);
+    if (!deliveryNoteDocumentNumber) {
+      throw new NotFoundError('ไม่พบใบส่งของสำหรับคำสั่งซื้อนี้');
+    }
+
     return createSignedObjectDownloadUrl({
       bucketName: deliveryNoteBucketName,
-      objectKey: `DN/${order.deliveryNote}`,
-      responseDisposition: `attachment; filename="${order.deliveryNote}"`
+      objectKey: `DN/${deliveryNoteDocumentNumber}.pdf`,
+      responseDisposition: `attachment; filename="${deliveryNoteDocumentNumber}.pdf"`
     });
   },
 
@@ -290,13 +345,24 @@ export const orderService = {
         return { order: updatedOrder, orderItems };
       }
 
-      const existingCredit = await creditService.getCreditByOrderId(id, activeSession);
+      const existingCredit = await getOrderCreditPort().getCreditByOrderId(id, activeSession);
       if (existingCredit) {
         throw new BadRequestError('คำสั่งซื้อนี้ถูกสรุปแล้ว');
       }
 
-      const credit = await creditService.createCreditForOrder({ ...updatedOrder, totalAmount }, activeSession);
-      const completedOrder = await upsertDeliveryNoteForOrder(updatedOrder, orderItems, activeSession);
+      const preparedDeliveryNote = await createPreparedDeliveryNote(updatedOrder, orderItems, activeSession);
+      const completedOrder = await persistDeliveryNoteOnOrder(
+        updatedOrder,
+        preparedDeliveryNote.documentNumber,
+        activeSession
+      );
+      const credit = await getOrderCreditPort().createCreditForOrder({ ...completedOrder, totalAmount }, activeSession);
+      await uploadObjectToBucket(
+        deliveryNoteBucketName,
+        `DN/${preparedDeliveryNote.pdf.filename}`,
+        preparedDeliveryNote.pdf.bytes,
+        preparedDeliveryNote.pdf.contentType
+      );
 
       return { order: completedOrder, orderItems, credit };
     };
@@ -341,7 +407,7 @@ export const orderService = {
       }
 
       const orderItems = await orderItemRepository.removeByOrderId(order._id.toString(), session);
-      const credits = await creditService.removeCreditsForOrder(order._id.toString(), session);
+      const credits = await getOrderCreditPort().removeCreditsForOrder(order._id.toString(), session);
       await Promise.all(credits.map((credit) => financeRepository.removeByCreditId(credit._id.toString(), session)));
       return { order, orderItems, credits };
     });

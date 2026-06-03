@@ -10,7 +10,15 @@ export const normalizeCreditStatus = (credit: CustomerCredit): CreditStatus => {
     return 'cancelled';
   }
 
-  return credit.paidAmount >= credit.totalAmount ? 'paid' : 'pending';
+  if (credit.totalAmount <= 0 || credit.paidAmount >= credit.totalAmount) {
+    return 'paid';
+  }
+
+  if (credit.paidAmount > 0) {
+    return 'partial';
+  }
+
+  return 'pending';
 };
 
 export const creditService = {
@@ -21,17 +29,22 @@ export const creditService = {
   createCreditForOrder(order: {
     _id: { toString(): string };
     customerId: string;
+    customerBillName: string;
+    dueDate: Date;
+    deliveryNote?: string;
     totalAmount: number;
     completedAt?: Date | null;
     cancelledAt?: Date | null;
   }, session?: ClientSession) {
-    const status: CreditStatus = order.cancelledAt ? 'cancelled' : order.completedAt ? 'paid' : 'pending';
-    const paidAmount = status === 'paid' ? order.totalAmount : 0;
+    const status: CreditStatus = order.cancelledAt ? 'cancelled' : 'pending';
     return creditRepository.create({
       orderId: order._id.toString(),
       customerId: order.customerId,
+      deliveryNote: order.deliveryNote,
+      customerBillName: order.customerBillName,
+      dueDate: order.dueDate,
       totalAmount: order.totalAmount,
-      paidAmount,
+      paidAmount: 0,
       status
     }, session);
   },
@@ -50,7 +63,15 @@ export const creditService = {
 
   async updateCreditFromOrder(
     orderId: string,
-    input: { sellPrice?: number; customerId?: string; completedAt?: string | null; cancelledAt?: string | null },
+    input: {
+      sellPrice?: number;
+      customerId?: string;
+      customerBillName?: string;
+      dueDate?: Date;
+      deliveryNote?: string;
+      completedAt?: string | null;
+      cancelledAt?: string | null;
+    },
     session?: ClientSession
   ) {
     const credit = await creditRepository.findByOrderId(orderId, session);
@@ -71,6 +92,9 @@ export const creditService = {
       totalAmount,
       paidAmount,
       customerId: typeof input.customerId === 'string' ? input.customerId : credit.customerId,
+      customerBillName: typeof input.customerBillName === 'string' ? input.customerBillName : credit.customerBillName,
+      dueDate: input.dueDate ?? credit.dueDate,
+      deliveryNote: input.deliveryNote ?? credit.deliveryNote,
       status
     }, session);
   },

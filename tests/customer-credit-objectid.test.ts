@@ -31,9 +31,10 @@ describeIfMongo('customer credit persistence', () => {
     await disconnectPersistence();
   });
 
-  it('stores customerId as an ObjectId in customer_credits', async () => {
+  it('stores object ids and snapshots in customer_credits', async () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
+    const orderId = new Types.ObjectId().toString();
 
     const customer = await request(app)
       .post('/api/v1/customers')
@@ -50,8 +51,11 @@ describeIfMongo('customer credit persistence', () => {
       .post('/api/v1/credits/customer-credits')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
-        orderId: new Types.ObjectId().toString(),
+        orderId,
         customerId: customer.body._id,
+        customerBillName: 'Mongo Credit Billing',
+        dueDate: '2026-06-30',
+        deliveryNote: 'DN20260630',
         totalAmount: 150,
         paidAmount: 0,
         status: 'pending'
@@ -60,7 +64,12 @@ describeIfMongo('customer credit persistence', () => {
     expect(created.status).toBe(201);
 
     const storedCredit = await CustomerCreditModel.findOne({ _id: created.body._id }).lean();
+    expect(storedCredit?.orderId).toBeInstanceOf(Types.ObjectId);
+    expect(storedCredit?.orderId.toString()).toBe(orderId);
     expect(storedCredit?.customerId).toBeInstanceOf(Types.ObjectId);
     expect(storedCredit?.customerId.toString()).toBe(customer.body._id);
+    expect(storedCredit?.customerBillName).toBe('Mongo Credit Billing');
+    expect(storedCredit?.deliveryNote).toBe('DN20260630');
+    expect(storedCredit?.dueDate).toEqual(new Date('2026-06-30T00:00:00.000Z'));
   });
 });
