@@ -23,6 +23,25 @@ export type SignedImageUploadUrl = {
   requiredHeaders: Record<string, string>;
 };
 
+export type CreateSignedObjectDownloadUrlInput = {
+  bucketName: string;
+  objectKey: string;
+  expiresInSeconds?: number;
+  responseDisposition?: string;
+};
+
+export type SignedObjectDownloadUrl = {
+  objectKey: string;
+  downloadUrl: string;
+  expiresAt: string;
+  method: 'GET';
+};
+
+export type UploadedGcsObject = {
+  bucketName: string;
+  objectKey: string;
+};
+
 const defaultSignedUrlExpiresSeconds = 15 * 60;
 
 const imageExtensionByMimeType: Record<string, string> = {
@@ -107,21 +126,22 @@ export const getGcsRuntimeConfig = (): GcsRuntimeConfig => {
 
   return {
     bucketName,
-    projectId: readOptionalEnv('GCS_PROJECT_ID'),
+    projectId: readOptionalEnv('GCP_PROJECT_ID'),
     keyFilename: readOptionalEnv('GCS_KEY_FILENAME'),
     signedUrlExpiresSeconds: getDefaultSignedUrlExpiresSeconds()
   };
 };
 
 export const createGcsClient = () => {
-  const config = getGcsRuntimeConfig();
   const storageOptions: StorageOptions = {};
+  const projectId = readOptionalEnv('GCP_PROJECT_ID');
+  const keyFilename = readOptionalEnv('GCS_KEY_FILENAME');
 
-  if (config.projectId) {
-    storageOptions.projectId = config.projectId;
+  if (projectId) {
+    storageOptions.projectId = projectId;
   }
-  if (config.keyFilename) {
-    storageOptions.keyFilename = config.keyFilename;
+  if (keyFilename) {
+    storageOptions.keyFilename = keyFilename;
   }
 
   return new Storage(storageOptions);
@@ -151,5 +171,64 @@ export const createSignedImageUploadUrl = async (
     requiredHeaders: {
       'Content-Type': contentType
     }
+  };
+};
+
+export const uploadObjectToBucket = async (
+  bucketName: string,
+  objectKey: string,
+  body: Buffer,
+  contentType: string
+): Promise<UploadedGcsObject> => {
+  const normalizedBucketName = bucketName.trim();
+  if (!normalizedBucketName) {
+    throw new InternalServerError('bucketName is required');
+  }
+
+  const normalizedContentType = contentType.trim().toLowerCase();
+  if (!normalizedContentType) {
+    throw new InternalServerError('contentType is required');
+  }
+
+  const storage = createGcsClient();
+  await storage.bucket(normalizedBucketName).file(objectKey).save(body, {
+    contentType: normalizedContentType,
+    resumable: false
+  });
+
+  return {
+    bucketName: normalizedBucketName,
+    objectKey
+  };
+};
+
+export const createSignedObjectDownloadUrl = async (
+  input: CreateSignedObjectDownloadUrlInput
+): Promise<SignedObjectDownloadUrl> => {
+  const normalizedBucketName = input.bucketName.trim();
+  if (!normalizedBucketName) {
+    throw new InternalServerError('bucketName is required');
+  }
+
+  const normalizedObjectKey = input.objectKey.trim().replace(/^\/+/, '');
+  if (!normalizedObjectKey) {
+    throw new InternalServerError('objectKey is required');
+  }
+
+  const expiresInSeconds = getSignedUrlExpiresSeconds(input.expiresInSeconds);
+  const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
+  const storage = createGcsClient();
+  const [downloadUrl] = await storage.bucket(normalizedBucketName).file(normalizedObjectKey).getSignedUrl({
+    version: 'v4',
+    action: 'read',
+    expires: expiresAt,
+    responseDisposition: input.responseDisposition?.trim() || undefined
+  });
+
+  return {
+    objectKey: normalizedObjectKey,
+    downloadUrl,
+    expiresAt: expiresAt.toISOString(),
+    method: 'GET'
   };
 };

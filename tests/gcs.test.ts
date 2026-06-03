@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   getSignedUrlMock,
+  saveMock,
   fileMock,
   bucketMock,
   storageConstructorMock
 } = vi.hoisted(() => {
   const getSignedUrlMock = vi.fn();
+  const saveMock = vi.fn();
   const fileMock = vi.fn(() => ({
-    getSignedUrl: getSignedUrlMock
+    getSignedUrl: getSignedUrlMock,
+    save: saveMock
   }));
   const bucketMock = vi.fn(() => ({
     file: fileMock
@@ -19,6 +22,7 @@ const {
 
   return {
     getSignedUrlMock,
+    saveMock,
     fileMock,
     bucketMock,
     storageConstructorMock
@@ -36,12 +40,13 @@ import {
   createGcsClient,
   createSignedImageUploadUrl,
   getGcsRuntimeConfig,
-  isGcsConfigured
+  isGcsConfigured,
+  uploadObjectToBucket
 } from '../src/shared/gcs';
 
 const originalEnv = {
   GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME,
-  GCS_PROJECT_ID: process.env.GCS_PROJECT_ID,
+  GCP_PROJECT_ID: process.env.GCP_PROJECT_ID,
   GCS_KEY_FILENAME: process.env.GCS_KEY_FILENAME,
   GCS_SIGNED_URL_EXPIRES_SECONDS: process.env.GCS_SIGNED_URL_EXPIRES_SECONDS
 };
@@ -50,6 +55,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-06-02T03:04:05.000Z'));
   getSignedUrlMock.mockReset();
+  saveMock.mockReset();
   fileMock.mockClear();
   bucketMock.mockClear();
   storageConstructorMock.mockClear();
@@ -79,7 +85,7 @@ describe('gcs runtime setup', () => {
 
   it('returns trimmed runtime config and default expiry', () => {
     process.env.GCS_BUCKET_NAME = ' erp-images ';
-    process.env.GCS_PROJECT_ID = ' demo-project ';
+    process.env.GCP_PROJECT_ID = ' demo-project ';
     process.env.GCS_KEY_FILENAME = ' /tmp/service-account.json ';
 
     expect(getGcsRuntimeConfig()).toEqual({
@@ -91,8 +97,7 @@ describe('gcs runtime setup', () => {
   });
 
   it('builds a storage client from the configured options', () => {
-    process.env.GCS_BUCKET_NAME = 'erp-images';
-    process.env.GCS_PROJECT_ID = 'demo-project';
+    process.env.GCP_PROJECT_ID = 'demo-project';
     process.env.GCS_KEY_FILENAME = '/tmp/service-account.json';
 
     const client = createGcsClient() as { options: unknown };
@@ -107,11 +112,10 @@ describe('gcs runtime setup', () => {
     });
   });
 
-  it('throws when the bucket name is missing', () => {
+  it('throws when the bucket name is missing for signed upload configuration', () => {
     delete process.env.GCS_BUCKET_NAME;
 
     expect(() => getGcsRuntimeConfig()).toThrow('GCS_BUCKET_NAME is required');
-    expect(() => createGcsClient()).toThrow('GCS_BUCKET_NAME is required');
   });
 
   it('throws when the configured default expiry is invalid', () => {
@@ -125,7 +129,7 @@ describe('gcs runtime setup', () => {
 describe('signed GCS image uploads', () => {
   it('creates a signed PUT upload URL for an image', async () => {
     process.env.GCS_BUCKET_NAME = 'erp-images';
-    process.env.GCS_PROJECT_ID = 'demo-project';
+    process.env.GCP_PROJECT_ID = 'demo-project';
     getSignedUrlMock.mockResolvedValue(['https://storage.googleapis.com/upload-url']);
 
     const result = await createSignedImageUploadUrl({
@@ -193,5 +197,31 @@ describe('signed GCS image uploads', () => {
         expiresInSeconds: 0
       })
     ).rejects.toThrow('expiresInSeconds must be a positive integer');
+  });
+
+  it('uploads a binary object to a chosen bucket', async () => {
+    process.env.GCP_PROJECT_ID = 'demo-project';
+
+    const body = Buffer.from('pdf-bytes');
+    const result = await uploadObjectToBucket(
+      ' correction-department-private ',
+      'DN/DN20260601.pdf',
+      body,
+      ' application/pdf '
+    );
+
+    expect(storageConstructorMock).toHaveBeenCalledWith({
+      projectId: 'demo-project'
+    });
+    expect(bucketMock).toHaveBeenCalledWith('correction-department-private');
+    expect(fileMock).toHaveBeenCalledWith('DN/DN20260601.pdf');
+    expect(saveMock).toHaveBeenCalledWith(body, {
+      contentType: 'application/pdf',
+      resumable: false
+    });
+    expect(result).toEqual({
+      bucketName: 'correction-department-private',
+      objectKey: 'DN/DN20260601.pdf'
+    });
   });
 });
