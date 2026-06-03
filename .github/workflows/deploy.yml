@@ -1,0 +1,26 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Create GCS key file
+      run: echo '${{ secrets.GCS_SERVICE_ACCOUNT }}' > ./gcs-key.json
+  
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Reconstruct the JSON key file safely from the GitHub Secret
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    # Now you can run your Cloud Build or gcloud commands directly
+    - name: Submit Cloud Build
+      run: |
+        gcloud builds submit --config=cloudbuild.yaml
