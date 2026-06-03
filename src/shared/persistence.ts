@@ -1,4 +1,5 @@
 import mongoose, { ClientSession, Schema, model, models } from 'mongoose';
+import { logger } from './logger';
 import {
   CreditStatus,
   Customer,
@@ -152,10 +153,10 @@ export const initiateDb = async () => {
         serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS || 5000)
       })
       .then((connection) => {
-        console.log('Connected to MongoDB:', connection.connection.host);
+        logger.info({ host: connection.connection.host }, 'connected to MongoDB');
       })
       .catch((error) => {
-        console.error('Failed to connect to MongoDB', error);
+        logger.error({ err: error }, 'failed to connect to MongoDB');
         initPromise = undefined;
         throw error;
       });

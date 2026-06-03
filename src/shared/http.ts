@@ -2,6 +2,21 @@ import { NextFunction, Request, Response } from 'express';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { HttpError } from './errors';
+import { logger } from './logger';
+
+export const formatZodError = (error: z.ZodError): Record<string, string> => {
+  const result: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const key = issue.path.length > 0 ? issue.path.join('.') : '_';
+    if (!result[key]) {
+      result[key] = issue.message;
+    }
+  }
+  return result;
+};
+
+export const sendZodError = (res: Response, error: z.ZodError) =>
+  res.status(400).json({ errors: formatZodError(error) });
 
 export const numberParamSchema = z.coerce.number().int().positive();
 
@@ -71,8 +86,11 @@ export const fallbackErrorHandler = (
     return;
   }
 
-  if (getHttpErrorStatus(error) === 500) {
-    console.error(error);
+  const status = getHttpErrorStatus(error);
+  if (status >= 500) {
+    logger.error({ err: error }, 'unhandled server error');
+  } else {
+    logger.warn({ err: error, status }, 'request error');
   }
 
   return sendHttpError(res, error);

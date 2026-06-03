@@ -11,9 +11,12 @@ import { BadRequestError, InternalServerError, NotFoundError } from '../../share
 import { createSignedImageUploadUrl, createSignedObjectDownloadUrl, uploadObjectToBucket } from '../../shared/gcs';
 import { runInTransaction, withSession } from '../../shared/persistence';
 import { createOpenAiClient, getOpenAiModel } from '../../shared/openai';
+import { logger } from '../../shared/logger';
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { OrderCreditPort } from './ports';
 import { orderRepository } from './repository';
+
+const log = logger.child({ module: 'order' });
 
 const deliveryNoteBucketName = 'correction-department-private';
 let orderCreditPort: OrderCreditPort | undefined;
@@ -205,6 +208,7 @@ export const orderService = {
       const order = await orderRepository.create(orderInput, session);
       const orderItems = await orderItemRepository.createMany(order._id.toString(), items, lifecycle, session);
       if (!order.completedAt) {
+        log.info({ orderId: order._id, customerId: order.customerId, status: 'draft', totalAmount }, 'order created');
         return { order, orderItems };
       }
 
@@ -218,6 +222,7 @@ export const orderService = {
         preparedDeliveryNote.pdf.contentType
       );
 
+      log.info({ orderId: updatedOrder._id, customerId: updatedOrder.customerId, status: 'completed', totalAmount, deliveryNote: preparedDeliveryNote.documentNumber }, 'order created');
       return { order: updatedOrder, orderItems, credit };
     });
   },
@@ -279,6 +284,7 @@ export const orderService = {
     }
 
     const updatedOrder = await upsertDeliveryNoteForOrder(order, orderItems);
+    log.info({ orderId, deliveryNote: updatedOrder.deliveryNote }, 'delivery note generated');
     return { order: updatedOrder, orderItems };
   },
 
@@ -342,6 +348,7 @@ export const orderService = {
       }
 
       if (nextStatus === 'draft') {
+        log.info({ orderId: id, status: 'draft', totalAmount }, 'order updated');
         return { order: updatedOrder, orderItems };
       }
 
@@ -364,6 +371,7 @@ export const orderService = {
         preparedDeliveryNote.pdf.contentType
       );
 
+      log.info({ orderId: id, status: 'completed', totalAmount, deliveryNote: preparedDeliveryNote.documentNumber }, 'order updated');
       return { order: completedOrder, orderItems, credit };
     };
 
@@ -409,6 +417,7 @@ export const orderService = {
       const orderItems = await orderItemRepository.removeByOrderId(order._id.toString(), session);
       const credits = await getOrderCreditPort().removeCreditsForOrder(order._id.toString(), session);
       await Promise.all(credits.map((credit) => financeRepository.removeByCreditId(credit._id.toString(), session)));
+      log.info({ orderId: id, itemCount: orderItems.length, creditCount: credits.length }, 'order removed');
       return { order, orderItems, credits };
     });
   },

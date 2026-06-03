@@ -1,5 +1,6 @@
 import { createRestApp } from './restApp';
 import { loadExternalEnv } from './shared/env';
+import { logger } from './shared/logger';
 import { initiateDb } from './shared/persistence';
 
 const start = async () => {
@@ -12,11 +13,11 @@ const start = async () => {
   const restApp = createRestApp();
 
   restApp.listen(restPort, () => {
-    console.log(`REST API server running on port ${restPort} using mongodb persistence`);
+    logger.info({ port: restPort }, 'REST API server started');
   });
 };
 
 start().catch((error) => {
-  console.error('Failed to start server', error);
+  logger.error({ err: error }, 'failed to start server');
   process.exit(1);
 });

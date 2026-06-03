@@ -1,6 +1,8 @@
 import express from 'express';
+import pinoHttp from 'pino-http';
 import { assertDbReady } from '../shared/persistence';
 import { fallbackErrorHandler } from '../shared/http';
+import { logger } from '../shared/logger';
 import { isOpenAiConfigured } from '../shared/openai';
 import { requireAuth } from '../modules/auth/middleware';
 import { createAuthRouter } from '../modules/auth/routes';
@@ -18,6 +20,7 @@ export const createRestApp = () => {
 
   const app = express();
   const apiV1 = express.Router();
+  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
