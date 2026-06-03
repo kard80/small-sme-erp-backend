@@ -138,6 +138,7 @@ const CounterModel = models.Counter || model('Counter', counterSchema, collectio
 let initPromise: Promise<void> | undefined;
 
 export const initiateDb = async () => {
+  logger.info('mongoose connection state: ' + mongoose.connection.readyState);
   if (mongoose.connection.readyState === 1) {
     return;
   }
@@ -148,6 +149,7 @@ export const initiateDb = async () => {
       throw new Error('MONGODB_URI is required');
     }
 
+    logger.info('connecting to MongoDB');
     initPromise = mongoose
       .connect(uri, {
         serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS || 5000)

@@ -8,13 +8,16 @@ const start = async () => {
   loadExternalEnv();
 
   const restPort = Number(process.env.PORT || 8080);
-  await initiateDb();
-
   const restApp = createRestApp();
 
-  restApp.listen(restPort, () => {
-    logger.info({ port: restPort }, 'REST API server started');
+  await new Promise<void>((resolve) => {
+    restApp.listen(restPort, () => {
+      logger.info({ port: restPort }, 'REST API server started');
+      resolve();
+    });
   });
+
+  await initiateDb();
 };
 
 start().catch((error) => {
