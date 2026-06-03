@@ -18,6 +18,7 @@ jobs:
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
       with:
+        workload_identity_provider: 'projects/433818871135/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
         credentials_json: ${{ secrets.GCP_SA_KEY }}
 
     # Now you can run your Cloud Build or gcloud commands directly
