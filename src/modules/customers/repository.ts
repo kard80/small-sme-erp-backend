@@ -10,23 +10,23 @@ export const customersRepository = {
 
   async list(page: number, pageSize: number) {
     const [data, total] = await Promise.all([
-      CustomerModel.find()
+      CustomerModel.find({ deletedAt: null })
         .sort({ _id: 1 })
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .lean<Customer[]>(),
-      CustomerModel.countDocuments({})
+      CustomerModel.countDocuments({ deletedAt: null })
     ]);
 
     return { data, page, pageSize, total };
   },
 
   findById(_id: string, session?: ClientSession) {
-    return CustomerModel.findOne({ _id }).session(session ?? null).lean<Customer | null>();
+    return CustomerModel.findOne({ _id, deletedAt: null }).session(session ?? null).lean<Customer | null>();
   },
 
   findByCustomerName(customerName: string) {
-    return CustomerModel.findOne({ customerName }).lean<Customer | null>();
+    return CustomerModel.findOne({ customerName, deletedAt: null }).lean<Customer | null>();
   },
 
   update(_id: string, input: EntityPatch<Customer, never>, session?: ClientSession) {
@@ -37,8 +37,11 @@ export const customersRepository = {
     ).session(session ?? null).lean<Customer | null>();
   },
 
-  async remove(_id: string, session?: ClientSession) {
-    const result = await CustomerModel.deleteOne({ _id }).session(session ?? null);
-    return result.deletedCount > 0;
+  remove(_id: string, session?: ClientSession) {
+    return CustomerModel.findOneAndUpdate(
+      { _id, deletedAt: null },
+      { $set: { deletedAt: new Date() } },
+      { returnDocument: 'before' }
+    ).session(session ?? null).lean<Customer | null>();
   }
 };

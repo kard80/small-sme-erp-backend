@@ -1,6 +1,7 @@
 import { ClientSession, Types } from 'mongoose';
 import { CustomerCreditModel } from '../../shared/persistence';
 import { CustomerCredit, EntityPatch, NewEntity } from '../../shared/types';
+import { pickDefined } from '../../shared/utils';
 
 const toObjectId = (value: string | Types.ObjectId) => (value instanceof Types.ObjectId ? value : new Types.ObjectId(value));
 
@@ -16,33 +17,9 @@ const toCustomerCreditCreateDoc = (input: NewEntity<CustomerCredit, never>) => (
 });
 
 const toCustomerCreditUpdateDoc = (input: EntityPatch<CustomerCredit, never>) => {
-  const update: Partial<Omit<CustomerCredit, '_id'>> = {};
-
-  if (input.orderId !== undefined) {
-    update.orderId = toObjectId(input.orderId);
-  }
-  if (input.customerId !== undefined) {
-    update.customerId = toObjectId(input.customerId);
-  }
-  if (input.deliveryNote !== undefined) {
-    update.deliveryNote = input.deliveryNote;
-  }
-  if (input.customerBillName !== undefined) {
-    update.customerBillName = input.customerBillName;
-  }
-  if (input.dueDate !== undefined) {
-    update.dueDate = input.dueDate;
-  }
-  if (input.totalAmount !== undefined) {
-    update.totalAmount = input.totalAmount;
-  }
-  if (input.paidAmount !== undefined) {
-    update.paidAmount = input.paidAmount;
-  }
-  if (input.status !== undefined) {
-    update.status = input.status;
-  }
-
+  const update = pickDefined(input);
+  if (update.orderId !== undefined) update.orderId = toObjectId(update.orderId);
+  if (update.customerId !== undefined) update.customerId = toObjectId(update.customerId);
   return update;
 };
 
@@ -52,20 +29,29 @@ export const creditRepository = {
     return credit.toObject();
   },
 
-  list() {
-    return CustomerCreditModel.find().sort({ _id: 1 }).lean<CustomerCredit[]>();
+  async list(page: number, pageSize: number) {
+    const [data, total] = await Promise.all([
+      CustomerCreditModel.find({ deletedAt: null })
+        .sort({ _id: 1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .lean<CustomerCredit[]>(),
+      CustomerCreditModel.countDocuments({ deletedAt: null })
+    ]);
+
+    return { data, page, pageSize, total };
   },
 
   findById(_id: string, session?: ClientSession) {
-    return CustomerCreditModel.findOne({ _id }).session(session ?? null).lean<CustomerCredit | null>();
+    return CustomerCreditModel.findOne({ _id, deletedAt: null }).session(session ?? null).lean<CustomerCredit | null>();
   },
 
   findByOrderId(orderId: string, session?: ClientSession) {
-    return CustomerCreditModel.findOne({ orderId: toObjectId(orderId) }).session(session ?? null).lean<CustomerCredit | null>();
+    return CustomerCreditModel.findOne({ orderId: toObjectId(orderId), deletedAt: null }).session(session ?? null).lean<CustomerCredit | null>();
   },
 
   listByOrderId(orderId: string) {
-    return CustomerCreditModel.find({ orderId: toObjectId(orderId) }).sort({ _id: 1 }).lean<CustomerCredit[]>();
+    return CustomerCreditModel.find({ orderId: toObjectId(orderId), deletedAt: null }).sort({ _id: 1 }).lean<CustomerCredit[]>();
   },
 
   update(_id: string, input: EntityPatch<CustomerCredit, never>, session?: ClientSession) {
@@ -79,16 +65,24 @@ export const creditRepository = {
   },
 
   remove(_id: string, session?: ClientSession) {
-    return CustomerCreditModel.findOneAndDelete({ _id }).session(session ?? null).lean<CustomerCredit | null>();
+    return CustomerCreditModel.findOneAndUpdate(
+      { _id, deletedAt: null },
+      { $set: { deletedAt: new Date() } },
+      { returnDocument: 'before' }
+    ).session(session ?? null).lean<CustomerCredit | null>();
   },
 
   async removeByOrderId(orderId: string, session?: ClientSession) {
     const orderObjectId = toObjectId(orderId);
-    const removed = await CustomerCreditModel.find({ orderId: orderObjectId })
+    const deletedAt = new Date();
+    const removed = await CustomerCreditModel.find({ orderId: orderObjectId, deletedAt: null })
       .session(session ?? null)
       .sort({ _id: 1 })
       .lean<CustomerCredit[]>();
-    await CustomerCreditModel.deleteMany({ orderId: orderObjectId }).session(session ?? null);
+    await CustomerCreditModel.updateMany(
+      { orderId: orderObjectId, deletedAt: null },
+      { $set: { deletedAt } }
+    ).session(session ?? null);
     return removed;
   }
 };

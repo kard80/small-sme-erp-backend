@@ -14,7 +14,8 @@ import {
 mongoose.set('strictQuery', true);
 
 const baseSchemaFields = {
-  createdAt: { type: Date, required: true, default: Date.now }
+  createdAt: { type: Date, required: true, default: Date.now },
+  deletedAt: { type: Date, required: false, default: null }
 };
 
 const baseSchemaOptions = {
@@ -109,8 +110,7 @@ const paymentTransactionSchema = createBaseSchema<PaymentTransaction>({
 const orderOcrUploadBatchSchema = createBaseSchema<OrderOcrUploadBatch>({
     folderName: { type: String, required: true, trim: true },
     filenames: { type: [String], required: true },
-    objectKeys: { type: [String], required: true },
-    createdAt: { type: Date, required: true }
+    objectKeys: { type: [String], required: true }
 });
 
 const counterSchema = createBaseSchema({

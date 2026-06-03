@@ -1,6 +1,7 @@
 import { ClientSession } from 'mongoose';
 import { OrderModel, OrderOcrUploadBatchModel } from '../../shared/persistence';
 import { EntityPatch, NewEntity, Order, OrderOcrUploadBatch } from '../../shared/types';
+import { pickDefined } from '../../shared/utils';
 
 const toOrderCreateDoc = (input: NewEntity<Order, never>) => ({
   customerId: input.customerId,
@@ -14,40 +15,6 @@ const toOrderCreateDoc = (input: NewEntity<Order, never>) => ({
   cancelledAt: input.cancelledAt
 });
 
-const toOrderUpdateDoc = (input: EntityPatch<Order, never>) => {
-  const update: Partial<Omit<Order, '_id'>> = {};
-
-  if (input.customerId !== undefined) {
-    update.customerId = input.customerId;
-  }
-  if (input.customerBillName !== undefined) {
-    update.customerBillName = input.customerBillName;
-  }
-  if (input.customerBillAddress !== undefined) {
-    update.customerBillAddress = input.customerBillAddress;
-  }
-  if (input.totalAmount !== undefined) {
-    update.totalAmount = input.totalAmount;
-  }
-  if (input.dueDate !== undefined) {
-    update.dueDate = input.dueDate;
-  }
-  if (input.deliveryDate !== undefined) {
-    update.deliveryDate = input.deliveryDate;
-  }
-  if (input.deliveryNote !== undefined) {
-    update.deliveryNote = input.deliveryNote;
-  }
-  if (input.completedAt !== undefined) {
-    update.completedAt = input.completedAt;
-  }
-  if (input.cancelledAt !== undefined) {
-    update.cancelledAt = input.cancelledAt;
-  }
-
-  return update;
-};
-
 export const orderRepository = {
   async create(input: NewEntity<Order, never>, session?: ClientSession) {
     const [order] = await OrderModel.create([toOrderCreateDoc(input)], { session });
@@ -56,21 +23,21 @@ export const orderRepository = {
 
   async list(page: number, pageSize: number) {
     const [data, total] = await Promise.all([
-      OrderModel.find().sort({ _id: 1 }).skip((page - 1) * pageSize).limit(pageSize).lean<Order[]>(),
-      OrderModel.countDocuments()
+      OrderModel.find({ deletedAt: null }).sort({ _id: 1 }).skip((page - 1) * pageSize).limit(pageSize).lean<Order[]>(),
+      OrderModel.countDocuments({ deletedAt: null })
     ]);
 
     return { data, page, pageSize, total };
   },
 
   findById(_id: string, session?: ClientSession) {
-    return OrderModel.findOne({ _id }).session(session ?? null).lean<Order | null>();
+    return OrderModel.findOne({ _id, deletedAt: null }).session(session ?? null).lean<Order | null>();
   },
 
   update(_id: string, input: EntityPatch<Order, never>, session?: ClientSession) {
     return OrderModel.findOneAndUpdate(
       { _id },
-      { $set: toOrderUpdateDoc(input) },
+      { $set: pickDefined(input) },
       { returnDocument: 'after', runValidators: true }
     )
       .lean<Order | null>()
@@ -97,6 +64,10 @@ export const orderRepository = {
   },
 
   remove(_id: string, session?: ClientSession) {
-    return OrderModel.findOneAndDelete({ _id }).session(session ?? null).lean<Order | null>();
+    return OrderModel.findOneAndUpdate(
+      { _id, deletedAt: null },
+      { $set: { deletedAt: new Date() } },
+      { returnDocument: 'before' }
+    ).session(session ?? null).lean<Order | null>();
   }
 };

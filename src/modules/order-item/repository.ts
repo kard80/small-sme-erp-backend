@@ -2,7 +2,7 @@ import { ClientSession, Types } from 'mongoose';
 import { OrderItemModel } from '../../shared/persistence';
 import { CreateOrderItemInput, OrderItem } from '../../shared/types';
 
-const toOrderItemCreateDoc = async (
+const toOrderItemCreateDoc = (
   orderId: string,
   itemOrder: number,
   input: CreateOrderItemInput,
@@ -28,13 +28,13 @@ export const orderItemRepository = {
     timestamps: Pick<OrderItem, 'completedAt' | 'cancelledAt'>,
     session?: ClientSession
   ) {
-    const docs = await Promise.all(items.map((item, index) => toOrderItemCreateDoc(orderId, index + 1, item, timestamps)));
+    const docs = items.map((item, index) => toOrderItemCreateDoc(orderId, index + 1, item, timestamps));
     const created = await OrderItemModel.create(docs, { session });
     return created.map((item) => item.toObject());
   },
 
   listByOrderId(orderId: string, session?: ClientSession) {
-    return OrderItemModel.find({ orderId }).sort({ order: 1 }).session(session ?? null).lean<OrderItem[]>();
+    return OrderItemModel.find({ orderId, deletedAt: null }).sort({ order: 1 }).session(session ?? null).lean<OrderItem[]>();
   },
 
   async updateLifecycleByOrderId(
@@ -43,7 +43,7 @@ export const orderItemRepository = {
     session?: ClientSession
   ) {
     await OrderItemModel.updateMany(
-      { orderId },
+      { orderId, deletedAt: null },
       {
         $set: {
           completedAt: timestamps.completedAt,
@@ -57,11 +57,15 @@ export const orderItemRepository = {
   },
 
   async removeByOrderId(orderId: string, session?: ClientSession) {
-    const removed = await OrderItemModel.find({ orderId })
+    const removed = await OrderItemModel.find({ orderId, deletedAt: null })
       .session(session ?? null)
       .sort({ order: 1 })
       .lean<OrderItem[]>();
-    await OrderItemModel.deleteMany({ orderId }).session(session ?? null);
+    const deletedAt = new Date();
+    await OrderItemModel.updateMany(
+      { orderId, deletedAt: null },
+      { $set: { deletedAt } }
+    ).session(session ?? null);
     return removed;
   }
 };
