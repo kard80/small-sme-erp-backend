@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express from 'express';
 import pinoHttp from 'pino-http';
 import { assertDbReady } from '../shared/persistence';
@@ -20,18 +21,13 @@ export const createRestApp = () => {
 
   const app = express();
   const apiV1 = express.Router();
+  app.use(cors({
+    origin: 'https://small-sme-erp-web-433818871135.asia-southeast1.run.app',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  }));
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
-  app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    if (req.method === 'OPTIONS') {
-      return res.status(204).send();
-    }
-
-    return next();
-  });
   app.use(express.json());
 
   app.get('/health', (_req, res) => {
