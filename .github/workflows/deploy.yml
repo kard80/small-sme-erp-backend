@@ -7,6 +7,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
     - name: Create GCS key file
       run: echo '${{ secrets.GCS_SERVICE_ACCOUNT }}' > ./gcs-key.json
