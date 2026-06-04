@@ -41,7 +41,7 @@ export const productRepository = {
   async list(page: number, pageSize: number) {
     const [data, total] = await Promise.all([
       ProductModel.find({ status: 'active' })
-        .sort({ _id: 1 })
+        .sort({ productName: 1 })
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .lean<Product[]>(),
