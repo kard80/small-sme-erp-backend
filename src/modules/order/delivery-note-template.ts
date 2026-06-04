@@ -228,7 +228,7 @@ export const buildDeliveryNoteHtml = (
       }
 
       thead th {
-        padding: 10px 12px;
+        padding: 4px 12px;
         text-align: left;
         font-size: 12px;
         font-weight: 600;
@@ -237,10 +237,11 @@ export const buildDeliveryNoteHtml = (
       }
 
       tbody td {
-        padding: 10px 12px;
+        padding: 4px 12px;
         vertical-align: top;
         border: 1px solid var(--border);
         background: white;
+        line-height: 1.2;
       }
 
       tbody tr:nth-child(even) td {
