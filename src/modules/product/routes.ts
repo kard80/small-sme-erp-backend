@@ -61,6 +61,10 @@ export const createProductRouter = () => {
   });
 
   router.get('/', async (req, res) => {
+    if (typeof req.query.search === 'string') {
+      return res.json(await productService.searchProducts(req.query.search));
+    }
+
     const parsed = paginationSchema.safeParse(req.query);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });

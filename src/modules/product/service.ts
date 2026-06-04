@@ -30,6 +30,10 @@ export const productService = {
     return productRepository.list(page, pageSize);
   },
 
+  searchProducts(query: string) {
+    return productRepository.search(query);
+  },
+
   async updateProduct(id: string, input: Parameters<typeof productRepository.update>[1]) {
     if (input.productName !== undefined) {
       await ensureProductNameAvailable(input.productName, id);

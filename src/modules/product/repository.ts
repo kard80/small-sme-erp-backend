@@ -59,6 +59,15 @@ export const productRepository = {
     return ProductModel.findOne({ productName, status: 'active' }).lean<Product | null>();
   },
 
+  search(query: string) {
+    return ProductModel.find({
+      status: 'active',
+      productName: { $regex: query, $options: 'i' }
+    })
+      .sort({ productName: 1 })
+      .lean<Product[]>();
+  },
+
   update(_id: string, input: EntityPatch<Product, never>, session?: ClientSession) {
     return ProductModel.findOneAndUpdate(
       { _id },
