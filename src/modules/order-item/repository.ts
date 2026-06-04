@@ -29,7 +29,7 @@ export const orderItemRepository = {
     session?: ClientSession
   ) {
     const docs = items.map((item, index) => toOrderItemCreateDoc(orderId, index + 1, item, timestamps));
-    const created = await OrderItemModel.create(docs, { session });
+    const created = await OrderItemModel.create(docs, { session, ordered: true });
     return created.map((item) => item.toObject());
   },
 
