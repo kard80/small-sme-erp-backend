@@ -1,4 +1,4 @@
-import moment from 'moment';
+import moment from '../../shared/moment';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 

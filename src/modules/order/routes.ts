@@ -25,6 +25,11 @@ export const createOrderRouter = () => {
     return res.json(await orderService.listOrders(parsed.data.page, parsed.data.pageSize));
   });
 
+  router.get('/summary', async (req, res) => {
+    const { startDate, endDate } = req.query as Record<string, string | undefined>;
+    return res.json(await orderService.getSummary(startDate, endDate));
+  });
+
   router.get('/:orderId/delivery-note', async (req, res) => {
     const orderId = req.params.orderId;
     if (typeof orderId !== 'string' || !Types.ObjectId.isValid(orderId)) {

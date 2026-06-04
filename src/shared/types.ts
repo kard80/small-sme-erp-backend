@@ -32,6 +32,7 @@ export interface Order extends MongoEntity {
   customerBillName: string;
   customerBillAddress: string;
   totalAmount: number;
+  totalExpense?: number;
   dueDate: Date;
   deliveryDate: Date;
   deliveryNote?: string;

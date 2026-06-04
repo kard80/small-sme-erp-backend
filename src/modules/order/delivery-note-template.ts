@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import moment from 'moment';
+import moment from '../../shared/moment';
 import { Order, OrderItem } from '../../shared/types';
 
 const thaiMonthNames = [

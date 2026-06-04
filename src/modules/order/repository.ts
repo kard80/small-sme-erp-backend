@@ -1,4 +1,5 @@
 import { ClientSession } from 'mongoose';
+import moment from '../../shared/moment';
 import { OrderModel, OrderOcrUploadBatchModel } from '../../shared/persistence';
 import { EntityPatch, NewEntity, Order, OrderOcrUploadBatch } from '../../shared/types';
 import { pickDefined } from '../../shared/utils';
@@ -8,6 +9,7 @@ const toOrderCreateDoc = (input: NewEntity<Order, never>) => ({
   customerBillName: input.customerBillName,
   customerBillAddress: input.customerBillAddress,
   totalAmount: input.totalAmount,
+  totalExpense: input.totalExpense,
   dueDate: input.dueDate,
   deliveryDate: input.deliveryDate,
   deliveryNote: input.deliveryNote,
@@ -69,5 +71,20 @@ export const orderRepository = {
       { $set: { deletedAt: new Date() } },
       { returnDocument: 'before' }
     ).session(session ?? null).lean<Order | null>();
-  }
+  },
+
+  async getSummary(startDate?: string, endDate?: string) {
+    const match: Record<string, unknown> = { deletedAt: null, cancelledAt: null, completedAt: { $ne: null } };
+    if (startDate || endDate) {
+      const range: Record<string, unknown> = {};
+      if (startDate) range.$gte = moment(startDate, 'YYYY-MM-DD').startOf('day').toDate();
+      if (endDate)   range.$lte = moment(endDate,   'YYYY-MM-DD').endOf('day').toDate();
+      match.completedAt = range;
+    }
+    const [result] = await OrderModel.aggregate<{ revenue: number; expenses: number }>([
+      { $match: match },
+      { $group: { _id: null, revenue: { $sum: '$totalAmount' }, expenses: { $sum: '$totalExpense' } } },
+    ]);
+    return { revenue: result?.revenue ?? 0, expenses: result?.expenses ?? 0 };
+  },
 };

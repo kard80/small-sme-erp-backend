@@ -69,6 +69,7 @@ const orderSchema = createBaseSchema<Order>({
     customerBillName: { type: String, required: true, trim: true },
     customerBillAddress: { type: String, required: true, trim: true },
     totalAmount: { type: Number, required: true, min: 0 },
+    totalExpense: { type: Number, required: false, min: 0 },
     dueDate: { type: Date, required: true },
     deliveryDate: { type: Date, required: true },
     deliveryNote: { type: String, required: false, trim: true },
@@ -102,7 +103,7 @@ const orderItemSchema = createBaseSchema<OrderItem>({
 });
 
 const paymentTransactionSchema = createBaseSchema<PaymentTransaction>({
-    customerCreditId: { type: String, required: true, index: true, trim: true },
+    customerCreditId: { type: Schema.Types.ObjectId, required: true, index: true },
     amount: { type: Number, required: true, min: 0 },
     paymentDate: { type: Date, required: true },
     note: { type: String, required: false, trim: true }

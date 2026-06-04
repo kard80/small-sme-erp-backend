@@ -112,7 +112,9 @@ const resolveOrderItems = (
   customerSnapshot: Awaited<ReturnType<typeof getCustomerBillingSnapshot>>
 ) => {
   const items = input.items;
-  const totalAmount = items.reduce((total, item) => total + item.sellPrice * item.quantity, 0);
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const totalAmount  = round2(items.reduce((sum, item) => sum + item.sellPrice * item.quantity, 0));
+  const totalExpense = round2(items.reduce((sum, item) => sum + item.buyPrice  * item.quantity, 0));
   const lifecycle = getOrderLifecycleFields(input.status);
 
   return {
@@ -124,6 +126,7 @@ const resolveOrderItems = (
       customerBillName: customerSnapshot.customerBillName,
       customerBillAddress: customerSnapshot.customerBillAddress,
       totalAmount,
+      totalExpense,
       dueDate: input.dueDate,
       deliveryDate: input.deliveryDate,
       deliveryNote: undefined,
@@ -405,6 +408,12 @@ export const orderService = {
     }
 
     return orderRepository.update(orderId, { completedAt: null, cancelledAt: null }, session);
+  },
+
+  async getSummary(startDate?: string, endDate?: string) {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const { revenue, expenses } = await orderRepository.getSummary(startDate, endDate);
+    return { revenue: round2(revenue), expenses: round2(expenses), profit: round2(revenue - expenses) };
   },
 
   removeOrder(id: string) {
