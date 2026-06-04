@@ -38,17 +38,20 @@ export const productRepository = {
     return product.toObject();
   },
 
-  async list(page: number, pageSize: number) {
-    const [data, total] = await Promise.all([
+  async list(page: number, pageSize: number, countZeroBuyPrice?: boolean) {
+    const [data, total, zeroBuyPriceCount] = await Promise.all([
       ProductModel.find({ status: 'active' })
         .sort({ productName: 1 })
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .lean<Product[]>(),
-      ProductModel.countDocuments({ status: 'active' })
+      ProductModel.countDocuments({ status: 'active' }),
+      countZeroBuyPrice
+        ? ProductModel.countDocuments({ status: 'active', defaultBuyPrice: 0 })
+        : Promise.resolve(null)
     ]);
 
-    return { data, page, pageSize, total };
+    return { data, page, pageSize, total, zeroBuyPriceCount };
   },
 
   findById(_id: string) {

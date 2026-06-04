@@ -70,7 +70,8 @@ export const createProductRouter = () => {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    return res.json(await productService.listProducts(parsed.data.page, parsed.data.pageSize));
+    const countZeroBuyPrice = req.query.countZeroBuyPrice === 'true';
+    return res.json(await productService.listProducts(parsed.data.page, parsed.data.pageSize, countZeroBuyPrice));
   });
 
   router.patch('/:id', async (req, res) => {

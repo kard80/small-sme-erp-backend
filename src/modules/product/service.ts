@@ -26,8 +26,8 @@ export const productService = {
     return productRepository.create(input);
   },
 
-  listProducts(page: number, pageSize: number) {
-    return productRepository.list(page, pageSize);
+  listProducts(page: number, pageSize: number, countZeroBuyPrice?: boolean) {
+    return productRepository.list(page, pageSize, countZeroBuyPrice);
   },
 
   searchProducts(query: string) {
