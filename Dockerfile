@@ -3,6 +3,8 @@ FROM node:24-slim AS builder
 
 WORKDIR /app
 
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
 COPY package*.json ./
 RUN npm ci
 
@@ -21,6 +23,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
@@ -28,8 +33,6 @@ COPY --from=builder /app/dist ./dist
 COPY assets/ ./assets/
 
 ENV NODE_ENV=production
-# Point Playwright to system Chromium instead of its downloaded binary
-ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
 EXPOSE 8080
 

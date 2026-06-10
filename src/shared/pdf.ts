@@ -12,7 +12,10 @@ const defaultPdfOptions = {
 };
 
 export const renderHtmlToPdf = async (html: string) => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+  });
 
   try {
     const page = await browser.newPage();
