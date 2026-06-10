@@ -65,12 +65,17 @@ export const createProductRouter = () => {
       return res.json(await productService.searchProducts(req.query.search));
     }
 
+    const countZeroBuyPrice = req.query.countZeroBuyPrice === 'true';
+
+    if (req.query.page === undefined && req.query.pageSize === undefined) {
+      return res.json(await productService.listProducts(undefined, undefined, countZeroBuyPrice));
+    }
+
     const parsed = paginationSchema.safeParse(req.query);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    const countZeroBuyPrice = req.query.countZeroBuyPrice === 'true';
     return res.json(await productService.listProducts(parsed.data.page, parsed.data.pageSize, countZeroBuyPrice));
   });
 
