@@ -19,6 +19,7 @@ export const renderHtmlToPdf = async (html: string) => {
 
   try {
     const page = await browser.newPage();
+    await page.setViewportSize({ width: 794, height: 1123 });
     await page.setContent(html, { waitUntil: 'load' });
     await page.emulateMedia({ media: 'print' });
     await page.evaluate(async () => {
