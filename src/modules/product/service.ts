@@ -73,28 +73,30 @@ export const productService = {
         continue;
       }
 
-      if (importedProductNames.has(parsed.data.productName)) {
+      const productKey = `${parsed.data.productName}_${parsed.data.unit}`;
+
+      if (importedProductNames.has(productKey)) {
         failed.push({
           row,
           productName: parsed.data.productName,
-          reason: 'พบชื่อสินค้าซ้ำในไฟล์นำเข้า'
+          reason: 'พบชื่อสินค้าและหน่วยซ้ำในไฟล์นำเข้า'
         });
         continue;
       }
 
-      const existingProduct = await productRepository.findByProductName(parsed.data.productName);
+      const existingProduct = await productRepository.findByProductNameAndUnit(parsed.data.productName, parsed.data.unit);
       if (existingProduct) {
         failed.push({
           row,
           productName: parsed.data.productName,
-          reason: 'ชื่อสินค้ามีอยู่แล้ว'
+          reason: 'ชื่อสินค้าและหน่วยมีอยู่แล้ว'
         });
         continue;
       }
 
       try {
         created.push(await productRepository.create(parsed.data));
-        importedProductNames.add(parsed.data.productName);
+        importedProductNames.add(productKey);
       } catch (error) {
         failed.push({
           row,

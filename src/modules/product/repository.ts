@@ -69,6 +69,10 @@ export const productRepository = {
     return ProductModel.findOne({ productName, status: 'active' }).lean<Product | null>();
   },
 
+  findByProductNameAndUnit(productName: string, unit: string) {
+    return ProductModel.findOne({ productName, unit, status: 'active' }).lean<Product | null>();
+  },
+
   search(query: string) {
     return ProductModel.find({
       status: 'active',
