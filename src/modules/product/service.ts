@@ -13,16 +13,16 @@ const formatRowReason = (issues: ZodIssue[]) =>
     })
     .join(', ');
 
-const ensureProductNameAvailable = async (productName: string, excludedId?: string) => {
-  const existingProduct = await productRepository.findByProductName(productName);
+const ensureProductNameAndUnitAvailable = async (productName: string, unit: string, excludedId?: string) => {
+  const existingProduct = await productRepository.findByProductNameAndUnit(productName, unit);
   if (existingProduct && existingProduct._id.toString() !== excludedId) {
-    throw new BadRequestError('ชื่อสินค้ามีอยู่แล้ว');
+    throw new BadRequestError('ชื่อสินค้าและหน่วยมีอยู่แล้ว');
   }
 };
 
 export const productService = {
   async createProduct(input: Parameters<typeof productRepository.create>[0]) {
-    await ensureProductNameAvailable(input.productName);
+    await ensureProductNameAndUnitAvailable(input.productName, input.unit);
     return productRepository.create(input);
   },
 
@@ -35,8 +35,11 @@ export const productService = {
   },
 
   async updateProduct(id: string, input: Parameters<typeof productRepository.update>[1]) {
-    if (input.productName !== undefined) {
-      await ensureProductNameAvailable(input.productName, id);
+    if (input.productName !== undefined || input.unit !== undefined) {
+      const current = await productRepository.findById(id);
+      const productName = input.productName ?? current?.productName ?? '';
+      const unit = input.unit ?? current?.unit ?? '';
+      await ensureProductNameAndUnitAvailable(productName, unit, id);
     }
 
     return productRepository.update(id, input);
