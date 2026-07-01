@@ -22,6 +22,7 @@ const thaiMonthNames = [
 const sellerName = 'ร้านเอกลักษณ์';
 const sellerAddress = '237 ถ.สุวรรณศร ต.สระแก้ว อ.เมือง จ.สระแก้ว';
 const sellerTel = '037241259, 0652324592';
+const department = 'ฝ่ายฝึกวิชาชีพ';
 
 
 export const convertAmountToThaiText = (amount: number) => {
@@ -413,7 +414,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         <p class="customer-heading">ข้อมูลลูกค้า</p>
         <p class="customer-name">${escapeHtml(order.customerBillName)}</p>
         <p class="customer-address">${escapeHtml(order.customerBillAddress)}</p>
-        ${order.customerDepartment ? `<p class="customer-department">${escapeHtml(order.customerDepartment)}</p>` : ''}
+        ${department ? `<p class="customer-department">${escapeHtml(department)}</p>` : ''}
       </section>
 
       <table aria-label="รายการสินค้าในใบส่งสินค้า">
