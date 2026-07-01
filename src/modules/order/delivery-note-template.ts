@@ -310,6 +310,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
       .words-value {
         text-align: center;
         border-left: none;
+        white-space: nowrap;
       }
 
       .signatures {
