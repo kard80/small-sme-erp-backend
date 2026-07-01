@@ -14,6 +14,7 @@ const toOrderCreateDoc = (input: NewEntity<Order, never>) => ({
   dueDate: input.dueDate,
   deliveryDate: input.deliveryDate,
   deliveryNote: input.deliveryNote,
+  materialCategory: input.materialCategory,
   completedAt: input.completedAt,
   cancelledAt: input.cancelledAt
 });

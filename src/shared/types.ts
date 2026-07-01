@@ -37,6 +37,7 @@ export interface Order extends MongoEntity {
   dueDate: Date;
   deliveryDate: Date;
   deliveryNote?: string;
+  materialCategory?: string;
   completedAt?: Date | null;
   cancelledAt?: Date | null;
 }
@@ -85,6 +86,7 @@ export interface OrderOcrUploadBatch extends MongoEntity {
 export interface CreateOrderInput {
   customerId: string;
   customerDepartment?: string;
+  materialCategory?: string;
   dueDate: Date;
   deliveryDate: Date;
   status: CreateOrderStatus;

@@ -74,6 +74,7 @@ const orderSchema = createBaseSchema<Order>({
     dueDate: { type: Date, required: true },
     deliveryDate: { type: Date, required: true },
     deliveryNote: { type: String, required: false, trim: true },
+    materialCategory: { type: String, required: false, trim: true },
     completedAt: { type: Date, required: false, default: null },
     cancelledAt: { type: Date, required: false, default: null }
 });
