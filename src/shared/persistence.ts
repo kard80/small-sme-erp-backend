@@ -68,6 +68,7 @@ const orderSchema = createBaseSchema<Order>({
     customerId: { type: String, required: true, index: true, trim: true },
     customerBillName: { type: String, required: true, trim: true },
     customerBillAddress: { type: String, required: true, trim: true },
+    customerDepartment: { type: String, required: false, trim: true },
     totalAmount: { type: Number, required: true, min: 0 },
     totalExpense: { type: Number, required: false, min: 0 },
     dueDate: { type: Date, required: true },

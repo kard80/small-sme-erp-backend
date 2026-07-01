@@ -125,6 +125,7 @@ const resolveOrderItems = (
       customerId: customerSnapshot.customerId,
       customerBillName: customerSnapshot.customerBillName,
       customerBillAddress: customerSnapshot.customerBillAddress,
+      customerDepartment: input.customerDepartment,
       totalAmount,
       totalExpense,
       dueDate: input.dueDate,
@@ -315,6 +316,7 @@ export const orderService = {
           : await getCustomerBillingSnapshot(nextCustomerId, activeSession);
       const nextDueDate = input.dueDate ?? existingOrder.dueDate;
       const nextDeliveryDate = input.deliveryDate ?? existingOrder.deliveryDate;
+      const nextCustomerDepartment = input.customerDepartment ?? existingOrder.customerDepartment;
 
       let orderItems = input.items
         ? await (async () => {
@@ -338,6 +340,7 @@ export const orderService = {
           customerId: customerSnapshot.customerId,
           customerBillName: customerSnapshot.customerBillName,
           customerBillAddress: customerSnapshot.customerBillAddress,
+          customerDepartment: nextCustomerDepartment,
           totalAmount,
           dueDate: nextDueDate,
           deliveryDate: nextDeliveryDate,

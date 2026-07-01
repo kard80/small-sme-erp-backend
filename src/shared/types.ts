@@ -31,6 +31,7 @@ export interface Order extends MongoEntity {
   customerId: string;
   customerBillName: string;
   customerBillAddress: string;
+  customerDepartment?: string;
   totalAmount: number;
   totalExpense?: number;
   dueDate: Date;
@@ -83,6 +84,7 @@ export interface OrderOcrUploadBatch extends MongoEntity {
 
 export interface CreateOrderInput {
   customerId: string;
+  customerDepartment?: string;
   dueDate: Date;
   deliveryDate: Date;
   status: CreateOrderStatus;

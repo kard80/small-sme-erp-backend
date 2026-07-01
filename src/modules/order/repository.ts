@@ -8,6 +8,7 @@ const toOrderCreateDoc = (input: NewEntity<Order, never>) => ({
   customerId: input.customerId,
   customerBillName: input.customerBillName,
   customerBillAddress: input.customerBillAddress,
+  customerDepartment: input.customerDepartment,
   totalAmount: input.totalAmount,
   totalExpense: input.totalExpense,
   dueDate: input.dueDate,

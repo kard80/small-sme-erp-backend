@@ -15,6 +15,7 @@ const orderItemInputSchema = z.object({
 
 export const orderInputSchema = z.object({
   customerId: z.string().regex(/^[0-9a-fA-F]{24}$/),
+  customerDepartment: z.string().trim().min(1).optional(),
   dueDate: thaiDate,
   deliveryDate: thaiDate,
   status: z.enum(['draft', 'completed']),

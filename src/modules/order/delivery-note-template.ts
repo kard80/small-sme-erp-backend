@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import ThaiBahtText from 'thai-baht-text';
 import moment from '../../shared/moment';
 import { Order, OrderItem } from '../../shared/types';
 
@@ -17,6 +18,16 @@ const thaiMonthNames = [
   'พฤศจิกายน',
   'ธันวาคม'
 ] as const;
+
+const sellerName = 'ร้านเอกลักษณ์';
+const sellerAddress = '237 ถ.สุวรรณศร ต.สระแก้ว อ.เมือง จ.สระแก้ว';
+const sellerTel = '037241259, 0652324592';
+
+
+export const convertAmountToThaiText = (amount: number) => {
+  const rounded = Math.round(amount * 100) / 100;
+  return ThaiBahtText(rounded) || 'ศูนย์บาทถ้วน';
+};
 
 const assetsRoot = resolve(__dirname, '../../../assets/fonts');
 const latinFontBase64 = readFileSync(resolve(assetsRoot, 'noto-sans-thai-latin-400-normal.woff2')).toString('base64');
@@ -66,15 +77,10 @@ const buildItemRows = (items: OrderItem[]) => {
     .join('');
 };
 
-export const buildDeliveryNoteHtml = (
-  order: Order,
-  items: OrderItem[],
-  documentNumber: string,
-  orderTotal: number
-) => {
+export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], documentNumber: string, orderTotal: number) => {
   const deliveryDate = formatThaiDate(order.deliveryDate);
-  const createdDate = formatThaiDate(order.createdAt);
   const rowsMarkup = buildItemRows(items);
+  const amountInThaiText = convertAmountToThaiText(orderTotal);
 
   return `<!DOCTYPE html>
 <html lang="th">
@@ -145,15 +151,20 @@ export const buildDeliveryNoteHtml = (
         letter-spacing: -0.02em;
       }
 
-      .subtitle {
+      .seller-name {
         margin-top: 6px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .seller-detail {
+        margin-top: 2px;
         color: var(--muted);
         font-size: 12px;
       }
 
       .meta-card,
       .customer-card,
-      .summary-box,
       .signatures {
         border: 1px solid var(--border);
         border-radius: 12px;
@@ -208,6 +219,14 @@ export const buildDeliveryNoteHtml = (
         margin: 6px 0 0;
         white-space: pre-wrap;
         word-break: break-word;
+      }
+
+      .customer-department {
+        margin: 6px 0 0;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       table {
@@ -267,40 +286,74 @@ export const buildDeliveryNoteHtml = (
         page-break-inside: avoid;
       }
 
-      .summary-box {
-        margin-left: auto;
-        width: min(260px, 100%);
-        padding: 12px 14px;
-        background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+      .totals-row td {
+        font-weight: 600;
+        background: var(--bg-head);
       }
 
-      .summary-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: center;
-        font-size: 14px;
-        font-weight: 600;
+      .totals-label {
+        text-align: right;
+      }
+
+      .words-label,
+      .words-value {
+        font-style: italic;
+        font-weight: 400;
+        color: var(--muted);
+      }
+
+      .words-label {
+        text-align: left;
+        border-right: none;
+      }
+
+      .words-value {
+        text-align: center;
+        border-left: none;
       }
 
       .signatures {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 24px;
+        gap: 64px;
         margin-top: 22px;
         padding: 18px 16px 14px;
       }
 
-      .signature-box {
-        min-height: 96px;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
+      .signature-col-right {
+        padding-left: 16px;
       }
 
-      .signature-line {
-        border-top: 1px solid #94a3b8;
-        padding-top: 8px;
+      .signature-block {
+        display: inline-block;
+        text-align: center;
+      }
+
+      .signature-row,
+      .signature-row-shorter {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-start;
+        gap: 0;
+        margin: 10px 0;
+      }
+
+      .signature-blank {
+        flex: 0 0 160px;
+        min-width: 24px;
+        margin: 0;
+        border-bottom: 1px solid var(--ink);
+      }
+
+      .signature-blank-shorter {
+        flex: 0 0 195px;
+        min-width: 24px;
+        margin: 0;
+        border-bottom: 1px solid var(--ink);
+      }
+
+      .signature-role {
+        margin: 4px 0;
         text-align: center;
       }
 
@@ -326,9 +379,8 @@ export const buildDeliveryNoteHtml = (
         th,
         .meta-card,
         .customer-card,
-        .summary-box,
         .signatures,
-        .signature-box {
+        .signature-col {
           break-inside: avoid;
           page-break-inside: avoid;
         }
@@ -340,7 +392,9 @@ export const buildDeliveryNoteHtml = (
       <section class="header">
         <div class="title-block">
           <h1>ใบส่งสินค้า</h1>
-          <div class="subtitle">เอกสารส่งมอบสินค้าและสรุปรายการสำหรับลูกค้า</div>
+          <div class="seller-name">${escapeHtml(sellerName)}</div>
+          <div class="seller-detail">${escapeHtml(sellerAddress)}</div>
+          <div class="seller-detail">${escapeHtml(sellerTel)}</div>
         </div>
         <aside class="meta-card">
           <div class="meta-row">
@@ -351,10 +405,6 @@ export const buildDeliveryNoteHtml = (
             <span class="meta-label">วันที่ส่งสินค้า</span>
             <span class="meta-value">${escapeHtml(deliveryDate)}</span>
           </div>
-          <div class="meta-row">
-            <span class="meta-label">วันที่สร้าง</span>
-            <span class="meta-value">${escapeHtml(createdDate)}</span>
-          </div>
         </aside>
       </section>
 
@@ -362,6 +412,7 @@ export const buildDeliveryNoteHtml = (
         <p class="customer-heading">ข้อมูลลูกค้า</p>
         <p class="customer-name">${escapeHtml(order.customerBillName)}</p>
         <p class="customer-address">${escapeHtml(order.customerBillAddress)}</p>
+        ${order.customerDepartment ? `<p class="customer-department">${escapeHtml(order.customerDepartment)}</p>` : ''}
       </section>
 
       <table aria-label="รายการสินค้าในใบส่งสินค้า">
@@ -385,23 +436,48 @@ export const buildDeliveryNoteHtml = (
         </thead>
         <tbody>
           ${rowsMarkup}
+          <tr class="totals-row">
+            <td colspan="2" class="words-label">(ตัวอักษร)</td>
+            <td colspan="2" class="words-value">(${escapeHtml(amountInThaiText)})</td>
+            <td class="totals-label">รวมเงิน</td>
+            <td class="numeric totals-value">${formatCurrency(orderTotal)}</td>
+          </tr>
         </tbody>
       </table>
 
       <section class="summary-signatures">
-        <div class="summary-box">
-          <div class="summary-row">
-            <span>รวมทั้งสิ้น</span>
-            <span>${formatCurrency(orderTotal)}</span>
-          </div>
-        </div>
-
         <div class="signatures">
-          <div class="signature-box">
-            <div class="signature-line">ผู้ส่งสินค้า</div>
+          <div class="signature-col">
+            <div class="signature-block">
+              <div class="signature-row">
+                <span>ลงชื่อ</span>
+                <span class="signature-blank"></span>
+                <span>ผู้ส่งของ</span>
+              </div>
+              <p class="signature-role">${escapeHtml(sellerName)}</p>
+            </div>
           </div>
-          <div class="signature-box">
-            <div class="signature-line">ผู้รับสินค้า</div>
+          <div class="signature-col signature-col-right">
+            <div class="signature-row">
+                <span>ลงชื่อ</span>
+                <span class="signature-blank"></span>
+                <span>${escapeHtml('ประธานกรรมการ')}</span>
+            </div>
+            <div class="signature-row">
+              <span>ลงชื่อ</span>
+              <span class="signature-blank-shorter"></span>
+              <span>${escapeHtml('กรรมการ')}</span>
+            </div>
+            <div class="signature-row">
+              <span>ลงชื่อ</span>
+              <span class="signature-blank-shorter"></span>
+              <span>${escapeHtml('กรรมการ')}</span>
+            </div>
+            <div class="signature-row">
+              <span>ลงชื่อ</span>
+              <span class="signature-blank-shorter"></span>
+              <span>${escapeHtml('เจ้าหน้าที่')}</span>
+            </div>
           </div>
         </div>
       </section>
