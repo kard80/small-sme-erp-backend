@@ -65,7 +65,7 @@ const customerSchema = createBaseSchema<Customer>({
 const creditStatusValues: CreditStatus[] = ['pending', 'partial', 'paid', 'cancelled'];
 
 const orderSchema = createBaseSchema<Order>({
-    customerId: { type: String, required: true, index: true, trim: true },
+    customerId: { type: Schema.Types.ObjectId, required: true, index: true },
     customerBillName: { type: String, required: true, trim: true },
     customerBillAddress: { type: String, required: true, trim: true },
     customerDepartment: { type: String, required: false, trim: true },

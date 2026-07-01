@@ -101,7 +101,7 @@ const getCustomerBillingSnapshot = async (customerId: string, session?: ClientSe
   }
 
   return {
-    customerId: customer._id.toString(),
+    customerId: customer._id,
     customerBillName: customer.billName,
     customerBillAddress: customer.address
   };
@@ -305,9 +305,9 @@ export const orderService = {
 
       const nextStatus = input.status ?? getPersistedOrderStatus(existingOrder);
       const nextLifecycle = getOrderLifecycleFields(nextStatus);
-      const nextCustomerId = input.customerId ?? existingOrder.customerId;
+      const nextCustomerId = input.customerId ?? existingOrder.customerId.toString();
       const customerSnapshot =
-        nextCustomerId === existingOrder.customerId
+        nextCustomerId === existingOrder.customerId.toString()
           ? {
               customerId: existingOrder.customerId,
               customerBillName: existingOrder.customerBillName,

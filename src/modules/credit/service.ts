@@ -28,7 +28,7 @@ export const creditService = {
 
   createCreditForOrder(order: {
     _id: Types.ObjectId;
-    customerId: string;
+    customerId: Types.ObjectId;
     customerBillName: string;
     dueDate: Date;
     deliveryNote?: string;
@@ -39,7 +39,7 @@ export const creditService = {
     const status: CreditStatus = order.cancelledAt ? 'cancelled' : 'pending';
     return creditRepository.create({
       orderId: order._id,
-      customerId: new Types.ObjectId(order.customerId),
+      customerId: order.customerId,
       deliveryNote: order.deliveryNote,
       customerBillName: order.customerBillName,
       dueDate: order.dueDate,

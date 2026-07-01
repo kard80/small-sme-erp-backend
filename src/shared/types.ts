@@ -28,7 +28,7 @@ export interface Customer extends MongoEntity {
 }
 
 export interface Order extends MongoEntity {
-  customerId: string;
+  customerId: Types.ObjectId;
   customerBillName: string;
   customerBillAddress: string;
   customerDepartment?: string;
