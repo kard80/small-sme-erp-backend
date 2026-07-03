@@ -22,8 +22,6 @@ const thaiMonthNames = [
 const sellerName = 'ร้านเอกลักษณ์';
 const sellerAddress = '237 ถ.สุวรรณศร ต.สระแก้ว อ.เมือง จ.สระแก้ว';
 const sellerTel = '037241259, 0652324592';
-const department = 'ฝ่ายฝึกวิชาชีพ';
-
 
 export const convertAmountToThaiText = (amount: number) => {
   const rounded = Math.round(amount * 100) / 100;
@@ -178,7 +176,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
 
       .meta-row {
         display: grid;
-        grid-template-columns: 96px minmax(0, 1fr);
+        grid-template-columns: 80px minmax(0, 1fr);
         gap: 10px;
         align-items: start;
       }
@@ -196,6 +194,10 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         font-weight: 500;
         min-width: 0;
         word-break: break-word;
+      }
+
+      .meta-value-nowrap {
+        white-space: nowrap;
       }
 
       .customer-card {
@@ -405,7 +407,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
           </div>
           <div class="meta-row">
             <span class="meta-label">วันที่ส่งสินค้า</span>
-            <span class="meta-value">${escapeHtml(deliveryDate)}</span>
+            <span class="meta-value meta-value-nowrap">${escapeHtml(deliveryDate)}</span>
           </div>
         </aside>
       </section>
@@ -414,7 +416,6 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         <p class="customer-heading">ข้อมูลลูกค้า</p>
         <p class="customer-name">${escapeHtml(order.customerBillName)}</p>
         <p class="customer-address">${escapeHtml(order.customerBillAddress)}</p>
-        ${department ? `<p class="customer-department">${escapeHtml(department)}</p>` : ''}
       </section>
 
       <table aria-label="รายการสินค้าในใบส่งสินค้า">
