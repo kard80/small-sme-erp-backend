@@ -15,6 +15,8 @@ import { logger } from '../../shared/logger';
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { OrderCreditPort } from './ports';
 import { orderRepository } from './repository';
+import { ComparableFilter } from '../../shared/filters';
+import { ListOrdersProps } from './types';
 
 const log = logger.child({ module: 'order' });
 
@@ -113,8 +115,8 @@ const resolveOrderItems = (
 ) => {
   const items = input.items;
   const round2 = (n: number) => Math.round(n * 100) / 100;
-  const totalAmount  = round2(items.reduce((sum, item) => sum + item.sellPrice * item.quantity, 0));
-  const totalExpense = round2(items.reduce((sum, item) => sum + item.buyPrice  * item.quantity, 0));
+  const totalAmount = round2(items.reduce((sum, item) => sum + item.sellPrice * item.quantity, 0));
+  const totalExpense = round2(items.reduce((sum, item) => sum + item.buyPrice * item.quantity, 0));
   const lifecycle = getOrderLifecycleFields(input.status);
 
   return {
@@ -172,11 +174,7 @@ const createPreparedDeliveryNote = async (
   };
 };
 
-const persistDeliveryNoteOnOrder = async (
-  order: Order,
-  documentNumber: string,
-  session?: ClientSession
-) => {
+const persistDeliveryNoteOnOrder = async (order: Order, documentNumber: string, session?: ClientSession) => {
   if (normalizeDeliveryNoteDocumentNumber(order.deliveryNote) === documentNumber) {
     return order;
   }
@@ -227,13 +225,22 @@ export const orderService = {
         preparedDeliveryNote.pdf.contentType
       );
 
-      log.info({ orderId: updatedOrder._id, customerId: updatedOrder.customerId, status: 'completed', totalAmount, deliveryNote: preparedDeliveryNote.documentNumber }, 'order created');
+      log.info(
+        {
+          orderId: updatedOrder._id,
+          customerId: updatedOrder.customerId,
+          status: 'completed',
+          totalAmount,
+          deliveryNote: preparedDeliveryNote.documentNumber
+        },
+        'order created'
+      );
       return { order: updatedOrder, orderItems, credit };
     });
   },
 
-  listOrders(page: number, pageSize: number) {
-    return orderRepository.list(page, pageSize);
+  listOrders(input: ListOrdersProps) {
+    return orderRepository.list(input);
   },
 
   getOrder(id: string) {
@@ -380,7 +387,10 @@ export const orderService = {
         preparedDeliveryNote.pdf.contentType
       );
 
-      log.info({ orderId: id, status: 'completed', totalAmount, deliveryNote: preparedDeliveryNote.documentNumber }, 'order updated');
+      log.info(
+        { orderId: id, status: 'completed', totalAmount, deliveryNote: preparedDeliveryNote.documentNumber },
+        'order updated'
+      );
       return { order: completedOrder, orderItems, credit };
     };
 

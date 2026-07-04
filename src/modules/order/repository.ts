@@ -3,6 +3,8 @@ import moment from '../../shared/moment';
 import { OrderModel, OrderOcrUploadBatchModel } from '../../shared/persistence';
 import { EntityPatch, NewEntity, Order, OrderOcrUploadBatch } from '../../shared/types';
 import { pickDefined } from '../../shared/utils';
+import { ListOrdersProps } from './types';
+import { ComparableFilter } from '../../shared/filters';
 
 const toOrderCreateDoc = (input: NewEntity<Order, never>) => ({
   customerId: input.customerId,
@@ -25,17 +27,30 @@ export const orderRepository = {
     return order.toObject();
   },
 
-  async list(page: number, pageSize: number) {
-    const [data, total] = await Promise.all([
-      OrderModel.find({ deletedAt: null }).sort({ _id: -1 }).skip((page - 1) * pageSize).limit(pageSize).lean<Order[]>(),
-      OrderModel.countDocuments({ deletedAt: null })
-    ]);
+  async list({ where, pagination, sort }: ListOrdersProps) {
+    const { page, pageSize, skip } = pagination;
+    const query: Record<string, unknown> = { deletedAt: null };
 
-    return { data, page, pageSize, total };
+    for (const [field, filter] of Object.entries(where ?? {})) {
+      if (filter instanceof ComparableFilter) {
+        query[field] = filter.toMongoOperator();
+      }
+    }
+
+    const cursor = OrderModel.find(query).sort(sort ?? { _id: -1 });
+    if (skip !== undefined && pageSize) {
+      cursor.skip(skip).limit(pageSize);
+    }
+
+    const [data, total] = await Promise.all([cursor.lean<Order[]>(), OrderModel.countDocuments(query)]);
+
+    return { data, page: page ?? 1, pageSize: pageSize ?? total, total };
   },
 
   findById(_id: string, session?: ClientSession) {
-    return OrderModel.findOne({ _id, deletedAt: null }).session(session ?? null).lean<Order | null>();
+    return OrderModel.findOne({ _id, deletedAt: null })
+      .session(session ?? null)
+      .lean<Order | null>();
   },
 
   update(_id: string, input: EntityPatch<Order, never>, session?: ClientSession) {
@@ -72,7 +87,9 @@ export const orderRepository = {
       { _id, deletedAt: null },
       { $set: { deletedAt: new Date() } },
       { returnDocument: 'before' }
-    ).session(session ?? null).lean<Order | null>();
+    )
+      .session(session ?? null)
+      .lean<Order | null>();
   },
 
   async getSummary(startDate?: string, endDate?: string) {
@@ -80,13 +97,13 @@ export const orderRepository = {
     if (startDate || endDate) {
       const range: Record<string, unknown> = {};
       if (startDate) range.$gte = moment(startDate, 'YYYY-MM-DD').startOf('day').toDate();
-      if (endDate)   range.$lte = moment(endDate,   'YYYY-MM-DD').endOf('day').toDate();
+      if (endDate) range.$lte = moment(endDate, 'YYYY-MM-DD').endOf('day').toDate();
       match.completedAt = range;
     }
     const [result] = await OrderModel.aggregate<{ revenue: number; expenses: number }>([
       { $match: match },
-      { $group: { _id: null, revenue: { $sum: '$totalAmount' }, expenses: { $sum: '$totalExpense' } } },
+      { $group: { _id: null, revenue: { $sum: '$totalAmount' }, expenses: { $sum: '$totalExpense' } } }
     ]);
     return { revenue: result?.revenue ?? 0, expenses: result?.expenses ?? 0 };
-  },
+  }
 };

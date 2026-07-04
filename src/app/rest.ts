@@ -14,6 +14,7 @@ import { createCustomersRouter } from '../modules/customers/routes';
 import { createFinanceRouter } from '../modules/finance/routes';
 import { createOrderRouter } from '../modules/order/routes';
 import { configureOrderPorts } from '../modules/order/service';
+import { createBillingRouter } from '../modules/billing/routes';
 
 export const createRestApp = () => {
   assertDbReady();
@@ -21,12 +22,14 @@ export const createRestApp = () => {
 
   const app = express();
   const apiV1 = express.Router();
+
   app.use(cors({
     origin: 'https://small-sme-erp-web-433818871135.asia-southeast1.run.app',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   }));
+
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
   app.use(express.json());
 
@@ -45,6 +48,7 @@ export const createRestApp = () => {
   apiV1.use('/auth', createAuthRouter());
   apiV1.use('/products', requireAuth, createProductRouter());
   apiV1.use('/customers', requireAuth, createCustomersRouter());
+  apiV1.use('/billings', requireAuth, createBillingRouter());
   apiV1.use('/orders', requireAuth, createOrderRouter());
   apiV1.use('/credits', requireAuth, createCreditRouter());
   apiV1.use('/finances', requireAuth, createFinanceRouter());

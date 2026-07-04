@@ -1,8 +1,14 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
 import { parseObjectIdParam, paginationSchema, sendZodError } from '../../shared/http';
-import { orderImageOcrInputSchema, orderInputSchema, orderOcrUploadBatchInputSchema, orderUpdateSchema } from './schemas';
+import {
+  orderImageOcrInputSchema,
+  orderInputSchema,
+  orderOcrUploadBatchInputSchema,
+  orderUpdateSchema
+} from './schemas';
 import { orderService } from './service';
+import { Pagination } from '../../shared/pagination';
 
 export const createOrderRouter = () => {
   const router = Router();
@@ -22,7 +28,9 @@ export const createOrderRouter = () => {
       return sendZodError(res, parsed.error);
     }
 
-    return res.json(await orderService.listOrders(parsed.data.page, parsed.data.pageSize));
+    const { page, pageSize } = parsed.data;
+    const pagination = new Pagination(page, pageSize);
+    return res.json(await orderService.listOrders({ pagination }));
   });
 
   router.get('/summary', async (req, res) => {
