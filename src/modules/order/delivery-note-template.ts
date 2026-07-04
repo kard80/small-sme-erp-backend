@@ -311,8 +311,15 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
       }
 
       .words-value {
-        text-align: center;
+        position: relative;
         border-left: none;
+      }
+
+      .words-value-text {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
         white-space: nowrap;
       }
 
@@ -441,7 +448,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
           ${rowsMarkup}
           <tr class="totals-row">
             <td colspan="2" class="words-label">(ตัวอักษร)</td>
-            <td colspan="2" class="words-value">(${escapeHtml(amountInThaiText)})</td>
+            <td colspan="2" class="words-value"><span class="words-value-text">(${escapeHtml(amountInThaiText)})</span></td>
             <td class="totals-label">รวมเงิน</td>
             <td class="numeric totals-value">${formatCurrency(orderTotal)}</td>
           </tr>

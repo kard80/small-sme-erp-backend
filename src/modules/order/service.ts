@@ -270,7 +270,7 @@ export const orderService = {
     return createSignedObjectDownloadUrl({
       bucketName: deliveryNoteBucketName,
       objectKey: `DN/${deliveryNoteDocumentNumber}.pdf`,
-      responseDisposition: `attachment; filename="${deliveryNoteDocumentNumber}.pdf"`
+      responseDisposition: `inline; filename="${deliveryNoteDocumentNumber}.pdf"`
     });
   },
 
