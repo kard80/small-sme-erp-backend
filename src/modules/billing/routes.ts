@@ -26,5 +26,20 @@ export const createBillingRouter = () => {
     });
   });
 
+  router.post('/documents', async (req, res) => {
+    const { date, customerId } = req.body;
+    const { success, error, data } = getBillingSchema.safeParse({ date, customerId });
+
+    if (!success) {
+      return res.status(400).json({ error: z.flattenError(error) });
+    }
+
+    const document = await billingService.generateBillingDocument(data.date, data.customerId);
+
+    res.setHeader('Content-Type', document.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
+    res.status(200).send(document.bytes);
+  });
+
   return router;
 };

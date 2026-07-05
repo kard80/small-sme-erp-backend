@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ThaiBahtText from 'thai-baht-text';
 import moment from '../../shared/moment';
-import { Order, OrderItem } from '../../shared/types';
+import { Customer, Order } from '../../shared/types';
 
 const thaiMonthNames = [
   'มกราคม',
@@ -21,9 +21,11 @@ const thaiMonthNames = [
 
 const sellerName = 'ร้านเอกลักษณ์';
 const sellerAddress = '237 ถ.สุวรรณศร ต.สระแก้ว อ.เมือง จ.สระแก้ว';
-const sellerTel = '037241259, 0652324592';
+const sellerTaxId = 'เลขประจำตัวผู้เสียภาษี 3250400514004';
 
-export const convertAmountToThaiText = (amount: number) => {
+export const billingDocumentNumber = '000001';
+
+const convertAmountToThaiText = (amount: number) => {
   const rounded = Math.round(amount * 100) / 100;
   return ThaiBahtText(rounded) || 'ศูนย์บาทถ้วน';
 };
@@ -47,7 +49,7 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-export const formatThaiDate = (value?: Date | null) => {
+const formatThaiDate = (value?: Date | null) => {
   if (!value) {
     return '';
   }
@@ -59,27 +61,30 @@ export const formatThaiDate = (value?: Date | null) => {
   return `${day} ${month} ${year}`;
 };
 
-const buildItemRows = (items: OrderItem[]) => {
-  return items
-    .map((item, index) => {
+const buildOrderRows = (orders: Order[]) => {
+  return orders
+    .map((order, index) => {
       return `
         <tr>
           <td class="col-index">${index + 1}</td>
-          <td class="col-product">${escapeHtml(item.productName)}</td>
-          <td class="col-qty numeric">${escapeHtml(String(item.quantity))}</td>
-          <td class="col-unit">${escapeHtml(item.unit)}</td>
-          <td class="col-price numeric">${formatCurrency(item.sellPrice)}</td>
-          <td class="col-total numeric">${formatCurrency(item.lineTotal)}</td>
+          <td class="col-date">${escapeHtml(formatThaiDate(order.deliveryDate))}</td>
+          <td class="col-note">${escapeHtml(order.deliveryNote ?? '')}</td>
+          <td class="col-total numeric">${formatCurrency(order.totalAmount)}</td>
         </tr>
       `;
     })
     .join('');
 };
 
-export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], documentNumber: string, orderTotal: number) => {
-  const deliveryDate = formatThaiDate(order.deliveryDate);
-  const rowsMarkup = buildItemRows(items);
-  const amountInThaiText = convertAmountToThaiText(orderTotal);
+export const buildBillingDocumentHtml = (
+  customer: Customer,
+  orders: Order[],
+  documentNumber: string,
+  issueDate: Date,
+  totalAmount: number
+) => {
+  const rowsMarkup = buildOrderRows(orders);
+  const amountInThaiText = convertAmountToThaiText(totalAmount);
 
   return `<!DOCTYPE html>
 <html lang="th">
@@ -88,7 +93,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
     <title>${escapeHtml(`${documentNumber}.pdf`)}</title>
     <style>
       @font-face {
-        font-family: 'DeliveryNoteThai';
+        font-family: 'BillingDocumentThai';
         src: url(data:font/woff2;base64,${latinFontBase64}) format('woff2');
         font-style: normal;
         font-weight: 400;
@@ -96,7 +101,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
       }
 
       @font-face {
-        font-family: 'DeliveryNoteThai';
+        font-family: 'BillingDocumentThai';
         src: url(data:font/woff2;base64,${thaiFontBase64}) format('woff2');
         font-style: normal;
         font-weight: 400;
@@ -121,7 +126,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         margin: 0;
         padding: 0;
         color: var(--ink);
-        font-family: 'DeliveryNoteThai', sans-serif;
+        font-family: 'BillingDocumentThai', sans-serif;
         font-size: 12px;
         line-height: 1.45;
         -webkit-font-smoothing: antialiased;
@@ -163,8 +168,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
       }
 
       .meta-card,
-      .customer-card,
-      .signatures {
+      .customer-card {
         border: 1px solid var(--border);
         border-radius: 12px;
         background: white;
@@ -224,26 +228,16 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         word-break: break-word;
       }
 
-      .customer-department {
-        margin: 6px 0 0;
-        color: var(--muted);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
       table {
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
       }
 
-      col.col-index { width: 8%; }
-      col.col-product { width: 38%; }
-      col.col-qty { width: 11%; }
-      col.col-unit { width: 11%; }
-      col.col-price { width: 15%; }
-      col.col-total { width: 17%; }
+      col.col-index { width: 10%; }
+      col.col-date { width: 25%; }
+      col.col-note { width: 30%; }
+      col.col-total { width: 35%; }
 
       thead {
         display: table-header-group;
@@ -279,39 +273,25 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         text-align: center;
       }
 
-      .col-product {
-        word-break: break-word;
-      }
-
-      .summary-signatures {
-        margin-top: 16px;
-        break-inside: avoid;
-        page-break-inside: avoid;
-      }
-
       .totals-row td {
         font-weight: 600;
         background: var(--bg-head);
       }
 
-      .totals-label {
-        text-align: right;
-      }
-
-      .words-label,
-      .words-value {
+      .words-label {
+        text-align: left;
         font-style: italic;
         font-weight: 400;
         color: var(--muted);
-      }
-
-      .words-label {
-        text-align: left;
         border-right: none;
       }
 
       .words-value {
         position: relative;
+        text-align: right;
+        font-style: italic;
+        font-weight: 400;
+        color: var(--muted);
         border-left: none;
       }
 
@@ -324,15 +304,11 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
       }
 
       .signatures {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 64px;
-        margin-top: 22px;
-        padding: 18px 16px 14px;
-      }
-
-      .signature-col-right {
-        padding-left: 16px;
+        display: flex;
+        justify-content: center;
+        margin-top: 48px;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
 
       .signature-block {
@@ -340,24 +316,16 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         text-align: center;
       }
 
-      .signature-row,
-      .signature-row-shorter {
+      .signature-row {
         display: flex;
         align-items: baseline;
-        justify-content: flex-start;
+        justify-content: center;
         gap: 0;
         margin: 10px 0;
       }
 
       .signature-blank {
-        flex: 0 0 160px;
-        min-width: 24px;
-        margin: 0;
-        border-bottom: 1px solid var(--ink);
-      }
-
-      .signature-blank-shorter {
-        flex: 0 0 195px;
+        flex: 0 0 180px;
         min-width: 24px;
         margin: 0;
         border-bottom: 1px solid var(--ink);
@@ -389,9 +357,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         td,
         th,
         .meta-card,
-        .customer-card,
-        .signatures,
-        .signature-col {
+        .customer-card {
           break-inside: avoid;
           page-break-inside: avoid;
         }
@@ -402,10 +368,10 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
     <main class="document">
       <section class="header">
         <div class="title-block">
-          <h1>ใบส่งสินค้า</h1>
+          <h1>ใบวางบิล</h1>
           <div class="seller-name">${escapeHtml(sellerName)}</div>
           <div class="seller-detail">${escapeHtml(sellerAddress)}</div>
-          <div class="seller-detail">${escapeHtml(sellerTel)}</div>
+          <div class="seller-detail">${escapeHtml(sellerTaxId)}</div>
         </div>
         <aside class="meta-card">
           <div class="meta-row">
@@ -413,82 +379,52 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
             <span class="meta-value">${escapeHtml(documentNumber)}</span>
           </div>
           <div class="meta-row">
-            <span class="meta-label">วันที่ส่งสินค้า</span>
-            <span class="meta-value meta-value-nowrap">${escapeHtml(deliveryDate)}</span>
+            <span class="meta-label">วันที่วางบิล</span>
+            <span class="meta-value meta-value-nowrap">${escapeHtml(formatThaiDate(issueDate))}</span>
           </div>
         </aside>
       </section>
 
       <section class="customer-card">
         <p class="customer-heading">ข้อมูลลูกค้า</p>
-        <p class="customer-name">${escapeHtml(order.customerBillName)}</p>
-        <p class="customer-address">${escapeHtml(order.customerBillAddress)}</p>
+        <p class="customer-name">${escapeHtml(customer.billName)}</p>
+        <p class="customer-address">${escapeHtml(customer.address)}</p>
+        <p class="customer-address">เลขประจำตัวผู้เสียภาษี 0994000284314</p>
       </section>
 
-      <table aria-label="รายการสินค้าในใบส่งสินค้า">
+      <table aria-label="รายการใบวางบิล">
         <colgroup>
           <col class="col-index" />
-          <col class="col-product" />
-          <col class="col-qty" />
-          <col class="col-unit" />
-          <col class="col-price" />
+          <col class="col-date" />
+          <col class="col-note" />
           <col class="col-total" />
         </colgroup>
         <thead>
           <tr>
-            <th>ลำดับ</th>
-            <th>รายการ</th>
-            <th class="numeric">จำนวน</th>
-            <th>หน่วย</th>
-            <th class="numeric">ราคา</th>
-            <th class="numeric">รวม</th>
+            <th>ลำดับที่</th>
+            <th>วันที่สั่งซื้อ</th>
+            <th>เลขที่ใบส่งของ</th>
+            <th class="numeric">จำนวนเงิน</th>
           </tr>
         </thead>
         <tbody>
           ${rowsMarkup}
           <tr class="totals-row">
-            <td colspan="2" class="words-label">(ตัวอักษร)</td>
-            <td colspan="2" class="words-value"><span class="words-value-text">(${escapeHtml(amountInThaiText)})</span></td>
-            <td class="totals-label">รวมเงิน</td>
-            <td class="numeric totals-value">${formatCurrency(orderTotal)}</td>
+            <td colspan="2" class="words-label">รวมเงิน</td>
+            <td class="words-value"><span class="words-value-text">(${escapeHtml(amountInThaiText)})</span></td>
+            <td class="numeric totals-value">${formatCurrency(totalAmount)}</td>
           </tr>
         </tbody>
       </table>
 
-      <section class="summary-signatures">
-        <div class="signatures">
-          <div class="signature-col">
-            <div class="signature-block">
-              <div class="signature-row">
-                <span>ลงชื่อ</span>
-                <span class="signature-blank"></span>
-                <span>ผู้ส่งของ</span>
-              </div>
-              <p class="signature-role">${escapeHtml(sellerName)}</p>
-            </div>
+      <section class="signatures">
+        <div class="signature-block">
+          <div class="signature-row">
+            <span>ลงชื่อ</span>
+            <span class="signature-blank"></span>
+            <span>ผู้วางบิล</span>
           </div>
-          <div class="signature-col signature-col-right">
-            <div class="signature-row">
-                <span>ลงชื่อ</span>
-                <span class="signature-blank"></span>
-                <span>${escapeHtml('ประธานกรรมการ')}</span>
-            </div>
-            <div class="signature-row">
-              <span>ลงชื่อ</span>
-              <span class="signature-blank-shorter"></span>
-              <span>${escapeHtml('กรรมการ')}</span>
-            </div>
-            <div class="signature-row">
-              <span>ลงชื่อ</span>
-              <span class="signature-blank-shorter"></span>
-              <span>${escapeHtml('กรรมการ')}</span>
-            </div>
-            <div class="signature-row">
-              <span>ลงชื่อ</span>
-              <span class="signature-blank-shorter"></span>
-              <span>${escapeHtml('เจ้าหน้าที่')}</span>
-            </div>
-          </div>
+          <p class="signature-role">(________________________________)</p>
         </div>
       </section>
     </main>
