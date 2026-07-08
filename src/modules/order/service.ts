@@ -4,7 +4,7 @@ import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 import { customersRepository } from '../customers/repository';
 import { financeRepository } from '../finance/repository';
-import { orderItemRepository } from '../order-item/repository';
+import { orderItemRepository } from './repository/order-item.repository';
 import { productRepository } from '../product/repository';
 import { CreateOrderInput, CreditStatus, Order } from '../../shared/types';
 import { BadRequestError, InternalServerError, NotFoundError } from '../../shared/errors';
@@ -14,7 +14,7 @@ import { createOpenAiClient, getOpenAiModel } from '../../shared/openai';
 import { logger } from '../../shared/logger';
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { OrderCreditPort } from './ports';
-import { orderRepository } from './repository';
+import { orderRepository } from './repository/order.repository';
 import { ComparableFilter } from '../../shared/filters';
 import { ListOrdersProps } from './types';
 
@@ -329,7 +329,7 @@ export const orderService = {
 
       let orderItems = input.items
         ? await (async () => {
-            await orderItemRepository.removeByOrderId(id, activeSession);
+            await orderItemRepository.hardDeleteByOrderId(id, activeSession);
             return orderItemRepository.createMany(id, input.items!, nextLifecycle, activeSession);
           })()
         : await orderItemRepository.listByOrderId(id, activeSession);

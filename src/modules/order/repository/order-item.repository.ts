@@ -1,6 +1,6 @@
 import { ClientSession, Types } from 'mongoose';
-import { OrderItemModel } from '../../shared/persistence';
-import { CreateOrderItemInput, OrderItem } from '../../shared/types';
+import { OrderItemModel } from '../../../shared/persistence';
+import { CreateOrderItemInput, OrderItem } from '../../../shared/types';
 
 const toOrderItemCreateDoc = (
   orderId: string,
@@ -52,6 +52,12 @@ export const orderItemRepository = {
     ).session(session ?? null);
 
     return this.listByOrderId(orderId, session);
+  },
+
+  async hardDeleteByOrderId(orderId: string, session?: ClientSession) {
+    const removed = await OrderItemModel.find({ orderId }).session(session ?? null).lean<OrderItem[]>();
+    await OrderItemModel.deleteMany({ orderId }).session(session ?? null);
+    return removed;
   },
 
   async removeByOrderId(orderId: string, session?: ClientSession) {
