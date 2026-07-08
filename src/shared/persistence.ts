@@ -100,8 +100,7 @@ const orderItemSchema = createBaseSchema<OrderItem>({
     buyPrice: { type: Number, required: true, min: 0 },
     sellPrice: { type: Number, required: true, min: 0 },
     lineTotal: { type: Number, required: true, min: 0 },
-    completedAt: { type: Date, required: false, default: null },
-    cancelledAt: { type: Date, required: false, default: null }
+    completedAt: { type: Date, required: false, default: null }
 });
 
 const paymentTransactionSchema = createBaseSchema<PaymentTransaction>({

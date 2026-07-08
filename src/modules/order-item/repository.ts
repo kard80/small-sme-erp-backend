@@ -6,7 +6,7 @@ const toOrderItemCreateDoc = (
   orderId: string,
   itemOrder: number,
   input: CreateOrderItemInput,
-  timestamps: Pick<OrderItem, 'completedAt' | 'cancelledAt'>
+  timestamps: Pick<OrderItem, 'completedAt'>
 ) => ({
   orderId: new Types.ObjectId(orderId),
   order: itemOrder,
@@ -17,15 +17,14 @@ const toOrderItemCreateDoc = (
   buyPrice: input.buyPrice,
   sellPrice: input.sellPrice,
   lineTotal: input.sellPrice * input.quantity,
-  completedAt: timestamps.completedAt,
-  cancelledAt: timestamps.cancelledAt
+  completedAt: timestamps.completedAt
 });
 
 export const orderItemRepository = {
   async createMany(
     orderId: string,
     items: CreateOrderItemInput[],
-    timestamps: Pick<OrderItem, 'completedAt' | 'cancelledAt'>,
+    timestamps: Pick<OrderItem, 'completedAt'>,
     session?: ClientSession
   ) {
     const docs = items.map((item, index) => toOrderItemCreateDoc(orderId, index + 1, item, timestamps));
@@ -39,15 +38,14 @@ export const orderItemRepository = {
 
   async updateLifecycleByOrderId(
     orderId: string,
-    timestamps: Pick<OrderItem, 'completedAt' | 'cancelledAt'>,
+    timestamps: Pick<OrderItem, 'completedAt'>,
     session?: ClientSession
   ) {
     await OrderItemModel.updateMany(
       { orderId, deletedAt: null },
       {
         $set: {
-          completedAt: timestamps.completedAt,
-          cancelledAt: timestamps.cancelledAt
+          completedAt: timestamps.completedAt
         }
       },
       { runValidators: true }

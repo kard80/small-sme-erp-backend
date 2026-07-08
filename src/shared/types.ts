@@ -53,7 +53,6 @@ export interface OrderItem extends MongoEntity {
   sellPrice: number;
   lineTotal: number;
   completedAt?: Date | null;
-  cancelledAt?: Date | null;
 }
 
 export interface CustomerCredit extends MongoEntity {
