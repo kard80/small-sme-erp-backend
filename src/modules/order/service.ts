@@ -160,6 +160,11 @@ const getDeliveryNoteDocumentNumber = async (order: Pick<Order, 'deliveryNote'>,
   return generateDeliveryNoteNumber(session);
 };
 
+// TODO: this is called with an active transaction session from createOrder/updateOrder,
+// which means Chromium PDF rendering runs while the MongoDB transaction is open. Move PDF
+// generation outside the transaction (generate before the transaction starts, or after it
+// commits) so a slow/failed browser launch can't abort the order write. Once done, remove
+// the --memory/--cpu bump added to the deploy step in cloudbuild.yaml for this workaround.
 const createPreparedDeliveryNote = async (
   order: Order,
   orderItems: Awaited<ReturnType<typeof orderItemRepository.listByOrderId>>,

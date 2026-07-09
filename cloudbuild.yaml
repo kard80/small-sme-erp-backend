@@ -45,6 +45,8 @@ steps:
       - --image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE:$COMMIT_SHA
       - --region=$_REGION
       - --platform=managed
+      - --memory=1Gi
+      - --cpu=2
       - --set-env-vars=MONGODB_URI=$_MONGODB_URI,NODE_ENV=$_NODE_ENV,GCS_KEY_FILENAME=/secrets/gcs-key.json
       - --set-secrets=/secrets/gcs-key.json=GCS_SERVICE_ACCOUNT_KEY:latest
 
