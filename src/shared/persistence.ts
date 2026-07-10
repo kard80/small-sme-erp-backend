@@ -25,7 +25,9 @@ const baseSchemaOptions = {
   minimize: false as const
 };
 
-const collectionNames = {
+export const collectionNames = {
+  billingNote: 'billing_notes',
+  billingNoteOrder: 'billing_note_orders',
   product: 'products',
   customer: 'customers',
   order: 'orders',
@@ -36,7 +38,7 @@ const collectionNames = {
   counter: 'counters'
 } as const;
 
-const createBaseSchema = <T>(definition: Record<string, unknown>) =>
+export const createBaseSchema = <T>(definition: Record<string, unknown>) =>
   new Schema<T>(
     {
       _id: { type: Schema.Types.ObjectId, auto: true },

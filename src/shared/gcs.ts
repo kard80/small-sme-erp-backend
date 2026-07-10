@@ -42,6 +42,8 @@ export type UploadedGcsObject = {
   objectKey: string;
 };
 
+export const correctionDepartmentBucketName = 'correction-department-private';
+
 const defaultSignedUrlExpiresSeconds = 15 * 60;
 
 const imageExtensionByMimeType: Record<string, string> = {

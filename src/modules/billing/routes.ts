@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import { getBillingSchema } from './schema';
+import { createBillingNoteDto, getBillingDto, manualInsertBillingNoteDto } from './dto';
 import z from 'zod';
-import { billingService } from './service';
+import { billingService } from './services/service';
 
 export const createBillingRouter = () => {
   const router = Router();
 
   router.get('/', async (req, res) => {
     const { date, customerId } = req.query;
-    const { success, error, data } = getBillingSchema.safeParse({ date, customerId });
+    const { success, error, data } = getBillingDto.safeParse({ date, customerId });
     if (!success) {
       return res.status(400).json({ error: z.flattenError(error) });
     }
@@ -26,19 +26,26 @@ export const createBillingRouter = () => {
     });
   });
 
-  router.post('/documents', async (req, res) => {
-    const { date, customerId } = req.body;
-    const { success, error, data } = getBillingSchema.safeParse({ date, customerId });
-
+  router.post('/', async (req, res) => {
+    const { success, error, data } = createBillingNoteDto.safeParse(req.body);
     if (!success) {
       return res.status(400).json({ error: z.flattenError(error) });
     }
 
-    const document = await billingService.generateBillingDocument(data.date, data.customerId);
+    const response = await billingService.createBillingNote(data.orderIds, data.issuedDate, data.customerId);
 
-    res.setHeader('Content-Type', document.contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
-    res.status(200).send(document.bytes);
+    res.status(201).json(response);
+  });
+
+  router.post('/billing-notes/:billingNoteId', async (req, res) => {
+    const { billingNoteId } = req.params;
+    const { success, error, data } = manualInsertBillingNoteDto.safeParse({ billingNoteId });
+    if (!success) {
+      return res.status(400).json({ error: z.flattenError(error) });
+    }
+
+    const response = await billingService.manualInsertBillingNote(data.billingNoteId);
+    res.status(201).json(response);
   });
 
   return router;

@@ -5,8 +5,9 @@ export class ComparableFilter<T> {
   readonly $lt?: T;
   readonly $lte?: T;
   readonly $ne?: T;
+  readonly $in?: T[];
 
-  constructor(input: { $eq?: T; $gt?: T; $gte?: T; $lt?: T; $lte?: T; $ne?: T }) {
+  constructor(input: { $eq?: T; $gt?: T; $gte?: T; $lt?: T; $lte?: T; $ne?: T; $in?: T[] }) {
     const inputLength = Object.keys(input).length;
     if (inputLength === 0) {
       throw new Error('ComparableFilter requires at least one of $eq, $gt, $gte, $lt, $lte');
@@ -16,6 +17,8 @@ export class ComparableFilter<T> {
       throw new Error('ComparableFilter cannot have $eq with other comparison operators');
     } else if (input.$ne !== undefined && inputLength > 1) {
       throw new Error('ComparableFilter cannot have $ne with other comparison operators');
+    } else if (input.$in !== undefined && inputLength > 1) {
+      throw new Error('ComparableFilter cannot have $in with other comparison operators');
     }
 
     if (input.$gt !== undefined && input.$gte !== undefined) {
@@ -29,8 +32,11 @@ export class ComparableFilter<T> {
     Object.assign(this, input);
   }
 
-  toMongoOperator(): Record<string, T> | T {
+  toMongoOperator(): Record<string, T> | T | Record<string, T[]> {
     if (this.$eq !== undefined) return this.$eq;
+    if (Array.isArray(this.$in)) {
+      return { $in: this.$in } as Record<string, T[]>;
+    }
 
     const operators: Record<string, T> = {};
     if (this.$gt !== undefined) operators.$gt = this.$gt;

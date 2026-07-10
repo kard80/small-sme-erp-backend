@@ -8,7 +8,12 @@ import { orderItemRepository } from './repository/order-item.repository';
 import { productRepository } from '../product/repository';
 import { CreateOrderInput, CreditStatus, Order } from '../../shared/types';
 import { BadRequestError, InternalServerError, NotFoundError } from '../../shared/errors';
-import { createSignedImageUploadUrl, createSignedObjectDownloadUrl, uploadObjectToBucket } from '../../shared/gcs';
+import {
+  correctionDepartmentBucketName,
+  createSignedImageUploadUrl,
+  createSignedObjectDownloadUrl,
+  uploadObjectToBucket
+} from '../../shared/gcs';
 import { runInTransaction, withSession } from '../../shared/persistence';
 import { createOpenAiClient, getOpenAiModel } from '../../shared/openai';
 import { logger } from '../../shared/logger';
@@ -20,7 +25,6 @@ import { ListOrdersProps } from './types';
 
 const log = logger.child({ module: 'order' });
 
-const deliveryNoteBucketName = 'correction-department-private';
 let orderCreditPort: OrderCreditPort | undefined;
 
 const getOrderCreditPort = () => {
@@ -199,7 +203,7 @@ const upsertDeliveryNoteForOrder = async (
 ) => {
   const { documentNumber, pdf: deliveryNotePdf } = await createPreparedDeliveryNote(order, orderItems, session);
   await uploadObjectToBucket(
-    deliveryNoteBucketName,
+    correctionDepartmentBucketName,
     `DN/${deliveryNotePdf.filename}`,
     deliveryNotePdf.bytes,
     deliveryNotePdf.contentType
@@ -224,7 +228,7 @@ export const orderService = {
       const updatedOrder = await persistDeliveryNoteOnOrder(order, preparedDeliveryNote.documentNumber, session);
       const credit = await getOrderCreditPort().createCreditForOrder({ ...updatedOrder, totalAmount }, session);
       await uploadObjectToBucket(
-        deliveryNoteBucketName,
+        correctionDepartmentBucketName,
         `DN/${preparedDeliveryNote.pdf.filename}`,
         preparedDeliveryNote.pdf.bytes,
         preparedDeliveryNote.pdf.contentType
@@ -280,7 +284,7 @@ export const orderService = {
     }
 
     return createSignedObjectDownloadUrl({
-      bucketName: deliveryNoteBucketName,
+      bucketName: correctionDepartmentBucketName,
       objectKey: `DN/${deliveryNoteDocumentNumber}.pdf`,
       responseDisposition: `inline; filename="${deliveryNoteDocumentNumber}.pdf"`
     });
@@ -386,7 +390,7 @@ export const orderService = {
       );
       const credit = await getOrderCreditPort().createCreditForOrder({ ...completedOrder, totalAmount }, activeSession);
       await uploadObjectToBucket(
-        deliveryNoteBucketName,
+        correctionDepartmentBucketName,
         `DN/${preparedDeliveryNote.pdf.filename}`,
         preparedDeliveryNote.pdf.bytes,
         preparedDeliveryNote.pdf.contentType

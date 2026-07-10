@@ -1,7 +1,33 @@
-import z from 'zod';
-import { objectIdSchema } from '../../shared/schema';
+import { model, Types } from 'mongoose';
+import { MongoEntity } from '../../types';
+import { collectionNames, createBaseSchema } from '../../shared/persistence';
 
-export const getBillingSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}/, 'Invalid date format, expected YYYY-MM'),
-  customerId: objectIdSchema,
+export interface BillingNote extends MongoEntity {
+  customerId: Types.ObjectId;
+  issuedDate: Date;
+  totalAmount: number;
+}
+
+export interface BillingNoteOrders extends MongoEntity {
+  billingNoteId: Types.ObjectId;
+  orderId: Types.ObjectId;
+  totalAmount: number;
+}
+
+const billingNoteSchema = createBaseSchema<BillingNote>({
+  customerId: { type: Types.ObjectId, required: true, index: true },
+  issuedDate: { type: Date, required: true },
+  totalAmount: { type: Number, required: true, min: 0 }
 });
+
+const billingNoteOrderSchema = createBaseSchema<BillingNoteOrders>({
+  billingNoteId: { type: Types.ObjectId, required: true, index: true },
+  orderId: { type: Types.ObjectId, required: true, index: true },
+});
+
+export const BillingNoteModel = model<BillingNote>('BillingNote', billingNoteSchema, collectionNames.billingNote);
+export const BillingNoteOrderModel = model<BillingNoteOrders>(
+  'BillingNoteOrder',
+  billingNoteOrderSchema,
+  collectionNames.billingNoteOrder
+);
