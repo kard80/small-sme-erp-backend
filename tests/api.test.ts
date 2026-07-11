@@ -110,7 +110,8 @@ describeIfMongo('ERP backend', () => {
       orderId: response.body.order._id,
       order: 1,
       quantity: 1,
-      lineTotal: 150
+      totalSellPrice: 150,
+      totalBuyPrice: 100
     });
     expect(response.body.credit).toBeUndefined();
     expect(response.body.deliveryNote).toBeUndefined();
@@ -210,13 +211,15 @@ describeIfMongo('ERP backend', () => {
       order: 1,
       productName: 'Widget A',
       quantity: 2,
-      lineTotal: 300
+      totalSellPrice: 300,
+      totalBuyPrice: 200
     });
     expect(response.body.orderItems[1]).toMatchObject({
       order: 2,
       productName: 'Widget B',
       quantity: 1,
-      lineTotal: 80
+      totalSellPrice: 80,
+      totalBuyPrice: 50
     });
   });
 
@@ -266,7 +269,8 @@ describeIfMongo('ERP backend', () => {
       orderId: created.body.order._id,
       productName: 'Widget A',
       quantity: 2,
-      lineTotal: 300
+      totalSellPrice: 300,
+      totalBuyPrice: 200
     });
   });
 
@@ -305,7 +309,8 @@ describeIfMongo('ERP backend', () => {
       productName: 'Widget B',
       unit: 'box',
       quantity: 2,
-      lineTotal: 240,
+      totalSellPrice: 240,
+      totalBuyPrice: 160,
       completedAt: null
     });
 

@@ -20,8 +20,8 @@ import { logger } from '../../shared/logger';
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { OrderCreditPort } from './ports';
 import { orderRepository } from './repository/order.repository';
-import { ComparableFilter } from '../../shared/filters';
 import { ListOrdersProps } from './types';
+import { Currency } from '../../shared/currency';
 
 const log = logger.child({ module: 'order' });
 
@@ -351,7 +351,9 @@ export const orderService = {
         orderItems = await orderItemRepository.updateLifecycleByOrderId(id, nextLifecycle, activeSession);
       }
 
-      const totalAmount = orderItems.reduce((total, item) => total + item.lineTotal, 0);
+      const totalAmount = orderItems
+        .reduce((total, item) => total.add(new Currency(item.totalSellPrice)), new Currency(0))
+        .toNumber();
       const updatedOrder = await orderRepository.update(
         id,
         {

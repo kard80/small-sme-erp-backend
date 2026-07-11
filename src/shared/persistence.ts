@@ -101,7 +101,8 @@ const orderItemSchema = createBaseSchema<OrderItem>({
     quantity: { type: Number, required: true, min: 0 },
     buyPrice: { type: Number, required: true, min: 0 },
     sellPrice: { type: Number, required: true, min: 0 },
-    lineTotal: { type: Number, required: true, min: 0 },
+    totalSellPrice: { type: Number, required: true, min: 0 },
+    totalBuyPrice: { type: Number, required: true, min: 0 },
     completedAt: { type: Date, required: false, default: null }
 });
 

@@ -1,6 +1,7 @@
 import { ClientSession, Types } from 'mongoose';
 import { OrderItemModel } from '../../../shared/persistence';
 import { CreateOrderItemInput, OrderItem } from '../../../shared/types';
+import { Currency } from '../../../shared/currency';
 
 const toOrderItemCreateDoc = (
   orderId: string,
@@ -16,7 +17,8 @@ const toOrderItemCreateDoc = (
   quantity: input.quantity,
   buyPrice: input.buyPrice,
   sellPrice: input.sellPrice,
-  lineTotal: input.sellPrice * input.quantity,
+  totalSellPrice: new Currency(input.sellPrice).multiply(input.quantity).toNumber(),
+  totalBuyPrice: new Currency(input.buyPrice).multiply(input.quantity).toNumber(),
   completedAt: timestamps.completedAt
 });
 

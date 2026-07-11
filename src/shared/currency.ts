@@ -10,6 +10,11 @@ export class Currency {
     return new Currency(sum);
   }
 
+  multiply(factor: number): Currency {
+    const product = Math.round(this.baht * factor * 100) / 100;
+    return new Currency(product);
+  }
+
   toNumber(): number {
     return this.baht;
   }

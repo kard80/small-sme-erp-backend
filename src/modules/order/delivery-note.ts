@@ -3,6 +3,7 @@ import { nextSequence } from '../../shared/persistence';
 import { renderHtmlToPdf } from '../../shared/pdf';
 import { Order, OrderItem } from '../../shared/types';
 import { buildDeliveryNoteHtml } from './delivery-note-template';
+import { Currency } from '../../shared/currency';
 
 const getDeliveryNoteMonthKey = (date: Date) => {
   const year = date.getFullYear();
@@ -22,7 +23,9 @@ export const generateDeliveryNotePdfBuffer = async (
   documentNumber: string
 ) => {
   const filename = `${documentNumber}.pdf`;
-  const orderTotal = items.reduce((total, item) => total + item.lineTotal, 0);
+  const orderTotal = items
+    .reduce((total, item) => total.add(new Currency(item.totalSellPrice)), new Currency(0))
+    .toNumber();
   const html = buildDeliveryNoteHtml(order, items, documentNumber, orderTotal);
   const buffer = await renderHtmlToPdf(html);
 

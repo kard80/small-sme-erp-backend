@@ -32,7 +32,8 @@ const buildItem = (orderId: Types.ObjectId, index: number, overrides: Partial<Or
     quantity: 1,
     buyPrice: 50,
     sellPrice: 100,
-    lineTotal: 100,
+    totalSellPrice: 100,
+    totalBuyPrice: 50,
     ...overrides
   };
 };
@@ -49,7 +50,8 @@ describe('delivery note template', () => {
         productName: 'ข้าวหอมมะลิถุงใหญ่พิเศษ ขนาด 5 กิโลกรัม สำหรับทดสอบข้อความยาวมาก',
         quantity: 12,
         sellPrice: 1234.56,
-        lineTotal: 14814.72
+        totalSellPrice: 14814.72,
+        totalBuyPrice: 600
       })
     ];
 
@@ -74,7 +76,8 @@ describe('generateDeliveryNotePdfBuffer', () => {
         unit: 'ถุง',
         quantity: 2,
         sellPrice: 75,
-        lineTotal: 150
+        totalSellPrice: 150,
+        totalBuyPrice: 100
       })
     ];
 
@@ -99,7 +102,7 @@ describe('generateDeliveryNotePdfBuffer', () => {
       buildItem(order._id, index, {
         productName: `สินค้า ${index + 1} รายการสำหรับทดสอบการตัดหน้าและการแสดงผลของคอลัมน์รวม`,
         sellPrice: 100,
-        lineTotal: 100
+        totalSellPrice: 100
       })
     );
 

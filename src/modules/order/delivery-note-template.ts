@@ -69,7 +69,7 @@ const buildItemRows = (items: OrderItem[]) => {
           <td class="col-qty numeric">${escapeHtml(String(item.quantity))}</td>
           <td class="col-unit">${escapeHtml(item.unit)}</td>
           <td class="col-price numeric">${formatCurrency(item.sellPrice)}</td>
-          <td class="col-total numeric">${formatCurrency(item.lineTotal)}</td>
+          <td class="col-total numeric">${formatCurrency(item.totalSellPrice)}</td>
         </tr>
       `;
     })

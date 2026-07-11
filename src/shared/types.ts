@@ -51,7 +51,8 @@ export interface OrderItem extends MongoEntity {
   quantity: number;
   buyPrice: number;
   sellPrice: number;
-  lineTotal: number;
+  totalSellPrice: number;
+  totalBuyPrice: number;
   completedAt?: Date | null;
 }
 
