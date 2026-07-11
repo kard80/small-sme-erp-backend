@@ -14,7 +14,7 @@ import { createCustomersRouter } from '../modules/customers/routes';
 import { createFinanceRouter } from '../modules/finance/routes';
 import { createOrderRouter } from '../modules/order/routes';
 import { configureOrderPorts } from '../modules/order/service';
-import { createBillingRouter } from '../modules/billing/routes';
+import { createBillingNoteRouter } from '../modules/billing-note/routes';
 
 export const createRestApp = () => {
   assertDbReady();
@@ -48,7 +48,7 @@ export const createRestApp = () => {
   apiV1.use('/auth', createAuthRouter());
   apiV1.use('/products', requireAuth, createProductRouter());
   apiV1.use('/customers', requireAuth, createCustomersRouter());
-  apiV1.use('/billings', requireAuth, createBillingRouter());
+  apiV1.use('/billing-notes', requireAuth, createBillingNoteRouter());
   apiV1.use('/orders', requireAuth, createOrderRouter());
   apiV1.use('/credits', requireAuth, createCreditRouter());
   apiV1.use('/finances', requireAuth, createFinanceRouter());

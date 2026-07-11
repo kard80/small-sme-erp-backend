@@ -204,6 +204,21 @@ export const uploadObjectToBucket = async (
   };
 };
 
+export const deleteObjectFromBucket = async (bucketName: string, objectKey: string): Promise<void> => {
+  const normalizedBucketName = bucketName.trim();
+  if (!normalizedBucketName) {
+    throw new InternalServerError('bucketName is required');
+  }
+
+  const normalizedObjectKey = objectKey.trim().replace(/^\/+/, '');
+  if (!normalizedObjectKey) {
+    throw new InternalServerError('objectKey is required');
+  }
+
+  const storage = createGcsClient();
+  await storage.bucket(normalizedBucketName).file(normalizedObjectKey).delete({ ignoreNotFound: true });
+};
+
 export const createSignedObjectDownloadUrl = async (
   input: CreateSignedObjectDownloadUrlInput
 ): Promise<SignedObjectDownloadUrl> => {

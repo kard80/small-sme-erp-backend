@@ -29,6 +29,10 @@ export const customersRepository = {
     return CustomerModel.findOne({ customerName, deletedAt: null }).lean<Customer | null>();
   },
 
+  findByIds(ids: string[]) {
+    return CustomerModel.find({ _id: { $in: ids }, deletedAt: null }).lean<Customer[]>();
+  },
+
   update(_id: string, input: EntityPatch<Customer, never>, session?: ClientSession) {
     return CustomerModel.findOneAndUpdate(
       { _id },

@@ -6,6 +6,7 @@ export interface BillingNote extends MongoEntity {
   customerId: Types.ObjectId;
   issuedDate: Date;
   totalAmount: number;
+  documentNumber?: string;
 }
 
 export interface BillingNoteOrders extends MongoEntity {
@@ -17,7 +18,8 @@ export interface BillingNoteOrders extends MongoEntity {
 const billingNoteSchema = createBaseSchema<BillingNote>({
   customerId: { type: Types.ObjectId, required: true, index: true },
   issuedDate: { type: Date, required: true },
-  totalAmount: { type: Number, required: true, min: 0 }
+  totalAmount: { type: Number, required: true, min: 0 },
+  documentNumber: { type: String, required: false }
 });
 
 const billingNoteOrderSchema = createBaseSchema<BillingNoteOrders>({

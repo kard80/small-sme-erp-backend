@@ -23,7 +23,7 @@ const sellerName = 'ร้านเอกลักษณ์';
 const sellerAddress = '237 ถ.สุวรรณศร ต.สระแก้ว อ.เมือง จ.สระแก้ว';
 const sellerTaxId = 'เลขประจำตัวผู้เสียภาษี 3250400514004';
 
-export const billingDocumentNumber = '000001';
+export const billingNoteDocumentNumber = '000001';
 
 const convertAmountToThaiText = (amount: number) => {
   const rounded = Math.round(amount * 100) / 100;
@@ -76,7 +76,7 @@ const buildOrderRows = (orders: Order[]) => {
     .join('');
 };
 
-export const buildBillingDocumentHtml = (
+export const buildBillingNoteDocumentHtml = (
   customer: Customer,
   orders: Order[],
   documentNumber: string,

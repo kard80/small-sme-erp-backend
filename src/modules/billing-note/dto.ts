@@ -1,8 +1,14 @@
 import z from 'zod';
-import { objectIdSchema } from '../../shared/schema';
+import { monthSchema, objectIdSchema } from '../../shared/schema';
 
-export const getBillingDto = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}/, 'Invalid date format, expected YYYY-MM'),
+export const getBillingNotesDto = z.object({
+  date: monthSchema,
+  customerId: objectIdSchema.optional()
+});
+
+export const getEligibleOrdersDto = z.object({
+  startDate: monthSchema,
+  endDate: monthSchema,
   customerId: objectIdSchema
 });
 
