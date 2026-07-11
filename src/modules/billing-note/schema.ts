@@ -6,7 +6,7 @@ export interface BillingNote extends MongoEntity {
   customerId: Types.ObjectId;
   issuedDate: Date;
   totalAmount: number;
-  documentNumber?: string;
+  documentNumber: string;
 }
 
 export interface BillingNoteOrders extends MongoEntity {
