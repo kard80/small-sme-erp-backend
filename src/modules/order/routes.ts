@@ -9,6 +9,8 @@ import {
 } from './schemas';
 import { orderService } from './service';
 import { Pagination } from '../../shared/pagination';
+import { ComparableFilter } from '../../shared/filters';
+import moment from '../../shared/moment';
 
 export const createOrderRouter = () => {
   const router = Router();
@@ -28,9 +30,26 @@ export const createOrderRouter = () => {
       return sendZodError(res, parsed.error);
     }
 
-    const { page, pageSize } = parsed.data;
+    const { page, pageSize, deliveryDateStart, deliveryDateEnd, status } = parsed.data;
     const pagination = new Pagination(page, pageSize);
-    return res.json(await orderService.listOrders({ pagination }));
+    let where: Record<string, ComparableFilter<unknown>> = {};
+    if (deliveryDateStart && deliveryDateEnd) {
+      where = {
+        deliveryDate: new ComparableFilter({
+          $gte: moment(deliveryDateStart, 'YYYY-MM-DD').startOf('day').toDate(),
+          $lte: moment(deliveryDateEnd, 'YYYY-MM-DD').endOf('day').toDate()
+        })
+      };
+    }
+    if (status === 'completed') {
+      where = { ...where, completedAt: new ComparableFilter({ $ne: null }) };
+    }
+    return res.json(
+      await orderService.listOrders({
+        pagination,
+        where
+      })
+    );
   });
 
   router.get('/summary', async (req, res) => {

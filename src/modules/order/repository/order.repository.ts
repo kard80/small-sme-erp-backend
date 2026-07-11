@@ -98,7 +98,7 @@ export const orderRepository = {
       const range: Record<string, unknown> = {};
       if (startDate) range.$gte = moment(startDate, 'YYYY-MM-DD').startOf('day').toDate();
       if (endDate) range.$lte = moment(endDate, 'YYYY-MM-DD').endOf('day').toDate();
-      match.completedAt = range;
+      match.deliveryDate = range;
     }
     const [result] = await OrderModel.aggregate<{ revenue: number; expenses: number }>([
       { $match: match },

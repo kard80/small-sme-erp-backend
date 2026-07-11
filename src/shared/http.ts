@@ -22,7 +22,10 @@ export const numberParamSchema = z.coerce.number().int().positive();
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(10)
+  pageSize: z.coerce.number().int().positive().max(500).default(10),
+  deliveryDateStart: z.string().optional(),
+  deliveryDateEnd: z.string().optional(),
+  status: z.enum(['completed']).optional(),
 });
 
 export const parseIdParam = (req: Request, res: Response, label: string) => {
