@@ -3,6 +3,7 @@ import multer from 'multer';
 import { paginationSchema, parseObjectIdParam } from '../../shared/http';
 import { createProductSchema, productUpdateSchema } from './schemas';
 import { productService } from './service';
+import { productOrderHistoryDto } from './dto';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -16,25 +17,19 @@ const isSheetArray = (value: unknown): value is ProductImportSheet[] =>
   Array.isArray(value) &&
   value.every(
     (entry) =>
-      entry !== null &&
-      typeof entry === 'object' &&
-      'sheet' in entry &&
-      'data' in entry &&
-      Array.isArray(entry.data)
+      entry !== null && typeof entry === 'object' && 'sheet' in entry && 'data' in entry && Array.isArray(entry.data)
   );
 
 export const extractProductImportRows = (value: unknown): ProductImportRow[] => {
-  const rows = isSheetArray(value) ? value[0]?.data ?? [] : Array.isArray(value) ? value : [];
-  return rows
-    .slice(1)
-    .map((row) => {
-      if (!Array.isArray(row)) {
-        return [];
-      }
+  const rows = isSheetArray(value) ? (value[0]?.data ?? []) : Array.isArray(value) ? value : [];
+  return rows.slice(1).map((row) => {
+    if (!Array.isArray(row)) {
+      return [];
+    }
 
-      const [productName, unit, sellPrice, defaultBuyPrice, status] = row;
-      return [productName, unit, defaultBuyPrice, sellPrice, status] as ProductImportRow;
-    });
+    const [productName, unit, sellPrice, defaultBuyPrice, status] = row;
+    return [productName, unit, defaultBuyPrice, sellPrice, status] as ProductImportRow;
+  });
 };
 
 export const createProductRouter = () => {
@@ -77,6 +72,15 @@ export const createProductRouter = () => {
     }
 
     return res.json(await productService.listProducts(parsed.data.page, parsed.data.pageSize, countZeroBuyPrice));
+  });
+
+  router.get('/:id', async (req, res) => {
+    const { success, error, data } = productOrderHistoryDto.safeParse({ productId: req.params.id, ...req.query });
+    if (!success) {
+      return res.status(400).json({ error: error.flatten() });
+    }
+
+    return res.json(await productService.getProductOrderHistory(data));
   });
 
   router.patch('/:id', async (req, res) => {

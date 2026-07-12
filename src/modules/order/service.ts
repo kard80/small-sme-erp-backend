@@ -118,9 +118,12 @@ const resolveOrderItems = (
   customerSnapshot: Awaited<ReturnType<typeof getCustomerBillingSnapshot>>
 ) => {
   const items = input.items;
-  const round2 = (n: number) => Math.round(n * 100) / 100;
-  const totalAmount = round2(items.reduce((sum, item) => sum + item.sellPrice * item.quantity, 0));
-  const totalExpense = round2(items.reduce((sum, item) => sum + item.buyPrice * item.quantity, 0));
+  const totalAmount = items
+    .reduce((sum, item) => sum.add(new Currency(item.sellPrice).multiply(item.quantity)), new Currency(0))
+    .toNumber();
+  const totalExpense = items
+    .reduce((sum, item) => sum.add(new Currency(item.buyPrice).multiply(item.quantity)), new Currency(0))
+    .toNumber();
   const lifecycle = getOrderLifecycleFields(input.status);
 
   return {

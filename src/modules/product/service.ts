@@ -2,6 +2,9 @@ import type { ZodIssue } from 'zod';
 import { BadRequestError } from '../../shared/errors';
 import { importProductSchema } from './schemas';
 import { productRepository } from './repository';
+import { orderItemService } from '../order/services/order-item';
+import { Pagination } from '../../shared/pagination';
+import moment from 'moment';
 
 type ProductImportRow = Array<string | number | undefined>;
 
@@ -20,10 +23,33 @@ const ensureProductNameAndUnitAvailable = async (productName: string, unit: stri
   }
 };
 
+interface GetProductHistoryParams {
+  productId: string;
+  page: number;
+  pageSize: number;
+  deliveryStartDate: string;
+  deliveryEndDate: string;
+}
+
 export const productService = {
   async createProduct(input: Parameters<typeof productRepository.create>[0]) {
     await ensureProductNameAndUnitAvailable(input.productName, input.unit);
     return productRepository.create(input);
+  },
+
+  async getProductOrderHistory(input: GetProductHistoryParams) {
+    if (!input.page || !input.pageSize) {
+      throw new BadRequestError('page and pageSize are required');
+    }
+
+    return orderItemService.findProductHistory({
+      productId: input.productId,
+      deliveryDateRange: {
+        start: moment(input.deliveryStartDate).toDate(),
+        end: moment(input.deliveryEndDate).toDate()
+      },
+      pagination: new Pagination(input.page, input.pageSize)
+    });
   },
 
   listProducts(page?: number, pageSize?: number, countZeroBuyPrice?: boolean) {
@@ -87,7 +113,10 @@ export const productService = {
         continue;
       }
 
-      const existingProduct = await productRepository.findByProductNameAndUnit(parsed.data.productName, parsed.data.unit);
+      const existingProduct = await productRepository.findByProductNameAndUnit(
+        parsed.data.productName,
+        parsed.data.unit
+      );
       if (existingProduct) {
         failed.push({
           row,
