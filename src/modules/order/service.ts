@@ -357,6 +357,9 @@ export const orderService = {
       const totalAmount = orderItems
         .reduce((total, item) => total.add(new Currency(item.totalSellPrice)), new Currency(0))
         .toNumber();
+      const totalExpense = orderItems
+        .reduce((total, item) => total.add(new Currency(item.totalBuyPrice)), new Currency(0))
+        .toNumber();
       const updatedOrder = await orderRepository.update(
         id,
         {
@@ -366,6 +369,7 @@ export const orderService = {
           customerDepartment: nextCustomerDepartment,
           materialCategory: nextMaterialCategory,
           totalAmount,
+          totalExpense,
           dueDate: nextDueDate,
           deliveryDate: nextDeliveryDate,
           completedAt: nextLifecycle.completedAt,
