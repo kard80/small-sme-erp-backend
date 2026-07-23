@@ -113,11 +113,7 @@ export const billingNoteService = {
 
       return billingNote;
     });
-    const documentNumber = await this.generateBillingNoteDocument(
-      moment(issuedDate).format('YYYY-MM'),
-      customerId,
-      orders.data
-    );
+    const documentNumber = await this.generateBillingNoteDocument(issuedDate, customerId, orders.data);
     const updatedBillingNote = await billingNoteRepository.setDocumentNumber(
       billingNoteResp._id.toString(),
       documentNumber
@@ -142,7 +138,7 @@ export const billingNoteService = {
     });
 
     const documentNumber = await this.generateBillingNoteDocument(
-      moment(billingNote.issuedDate).format('YYYY-MM'),
+      billingNote.issuedDate,
       billingNote.customerId.toString(),
       orders.data,
       billingNote.documentNumber
@@ -169,7 +165,7 @@ export const billingNoteService = {
   },
 
   async generateBillingNoteDocument(
-    dateInput: string,
+    issueDate: Date,
     customerId: string,
     orders: Order[],
     billingNoteNumber?: string
@@ -180,11 +176,10 @@ export const billingNoteService = {
       throw new NotFoundError('ไม่พบข้อมูลลูกค้า');
     }
 
-    const issueDate = moment(dateInput, 'YYYY-MM').endOf('month').toDate();
-
     let billingNoteDocument = billingNoteNumber;
     if (!billingNoteDocument) {
-      const runningNumber = await nextSequence('billingNotes:' + issueDate);
+      const monthBucket = moment(issueDate).format('YYYY-MM');
+      const runningNumber = await nextSequence('billingNotes:' + monthBucket);
       billingNoteDocument = 'BL' + moment(issueDate).format('YYYYMM') + runningNumber.toString().padStart(2, '0');
     }
 
