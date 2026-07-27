@@ -20,8 +20,9 @@ import { logger } from '../../shared/logger';
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { OrderCreditPort } from './ports';
 import { orderRepository } from './repository/order.repository';
-import { ListOrdersProps } from './types';
+import { ListOrdersProps, OrderWithEditable } from './types';
 import { Currency } from '../../shared/currency';
+import { billingNoteOrderRepository } from '../billing-note/repository/billing-note-order.repository';
 
 const log = logger.child({ module: 'order' });
 
@@ -98,6 +99,16 @@ const getOrderLifecycleFields = (status: CreateOrderInput['status']) => {
     completedAt: status === 'completed' ? now : null,
     cancelledAt: null
   } satisfies Pick<Order, 'completedAt' | 'cancelledAt'>;
+};
+
+const isOrderEditable = (order: Pick<Order, 'completedAt' | 'cancelledAt'>, billed: boolean) => {
+  if (order.cancelledAt) {
+    return false;
+  }
+  if (!order.completedAt) {
+    return true;
+  }
+  return !billed;
 };
 
 const getCustomerBillingSnapshot = async (customerId: string, session?: ClientSession) => {
@@ -251,8 +262,23 @@ export const orderService = {
     });
   },
 
-  listOrders(input: ListOrdersProps) {
-    return orderRepository.list(input);
+  async listOrders(input: ListOrdersProps): Promise<{
+    data: OrderWithEditable[];
+    page: number;
+    pageSize: number;
+    total: number;
+  }> {
+    const result = await orderRepository.list(input);
+    const billedOrderIds = await billingNoteOrderRepository.listBilledOrderIds(result.data.map((order) => order._id));
+    const billedOrderIdSet = new Set(billedOrderIds.map((orderId) => orderId.toString()));
+
+    return {
+      ...result,
+      data: result.data.map((order) => ({
+        ...order,
+        editable: isOrderEditable(order, billedOrderIdSet.has(order._id.toString()))
+      }))
+    };
   },
 
   getOrder(id: string) {
@@ -319,8 +345,9 @@ export const orderService = {
         return undefined;
       }
 
-      if (existingOrder.completedAt) {
-        throw new BadRequestError('ไม่สามารถแก้ไขคำสั่งซื้อที่เสร็จสิ้นแล้วได้');
+      const billed = await billingNoteOrderRepository.isOrderBilled(id);
+      if (!isOrderEditable(existingOrder, billed)) {
+        throw new BadRequestError('ไม่สามารถแก้ไขคำสั่งซื้อนี้ได้ เนื่องจากถูกใช้สร้างใบวางบิลแล้ว');
       }
 
       const nextStatus = input.status ?? getPersistedOrderStatus(existingOrder);
