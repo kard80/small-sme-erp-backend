@@ -157,9 +157,6 @@ const resolveOrderItems = (
   };
 };
 
-const getPersistedOrderStatus = (order: Pick<Order, 'completedAt'>): CreateOrderInput['status'] =>
-  order.completedAt ? 'completed' : 'draft';
-
 const normalizeDeliveryNoteDocumentNumber = (deliveryNote?: string) => {
   const value = deliveryNote?.trim();
   if (!value) {
@@ -224,6 +221,167 @@ const upsertDeliveryNoteForOrder = async (
   );
 
   return persistDeliveryNoteOnOrder(order, documentNumber, session);
+};
+
+// Recomputes items/customer/date fields shared by both the draft and completed-order update
+// flows, persists them, and returns the updated order along with the recalculated totals.
+// Does not touch delivery note or credit records — callers handle those per-flow.
+const applyOrderFieldUpdates = async (
+  id: string,
+  existingOrder: Order,
+  input: Partial<CreateOrderInput>,
+  nextLifecycle: Pick<Order, 'completedAt' | 'cancelledAt'>,
+  activeSession: ClientSession
+) => {
+  const nextCustomerId = input.customerId ?? existingOrder.customerId.toString();
+  const customerSnapshot =
+    nextCustomerId === existingOrder.customerId.toString()
+      ? {
+          customerId: existingOrder.customerId,
+          customerBillName: existingOrder.customerBillName,
+          customerBillAddress: existingOrder.customerBillAddress
+        }
+      : await getCustomerBillingSnapshot(nextCustomerId, activeSession);
+  const nextDueDate = input.dueDate ?? existingOrder.dueDate;
+  const nextDeliveryDate = input.deliveryDate ?? existingOrder.deliveryDate;
+  const nextCustomerDepartment = input.customerDepartment ?? existingOrder.customerDepartment;
+  const nextMaterialCategory = input.materialCategory ?? existingOrder.materialCategory;
+
+  let orderItems = input.items
+    ? await (async () => {
+        await orderItemRepository.hardDeleteByOrderId(id, activeSession);
+        return orderItemRepository.createMany(id, input.items!, nextLifecycle, activeSession);
+      })()
+    : await orderItemRepository.listByOrderId(id, activeSession);
+
+  if (orderItems.length === 0) {
+    throw new BadRequestError('คำสั่งซื้อต้องมีอย่างน้อย 1 รายการ');
+  }
+
+  if (!input.items && nextLifecycle.completedAt) {
+    orderItems = await orderItemRepository.updateLifecycleByOrderId(id, nextLifecycle, activeSession);
+  }
+
+  const totalAmount = orderItems
+    .reduce((total, item) => total.add(new Currency(item.totalSellPrice)), new Currency(0))
+    .toNumber();
+  const totalExpense = orderItems
+    .reduce((total, item) => total.add(new Currency(item.totalBuyPrice)), new Currency(0))
+    .toNumber();
+
+  const updatedOrder = await orderRepository.update(
+    id,
+    {
+      customerId: customerSnapshot.customerId,
+      customerBillName: customerSnapshot.customerBillName,
+      customerBillAddress: customerSnapshot.customerBillAddress,
+      customerDepartment: nextCustomerDepartment,
+      materialCategory: nextMaterialCategory,
+      totalAmount,
+      totalExpense,
+      dueDate: nextDueDate,
+      deliveryDate: nextDeliveryDate,
+      completedAt: nextLifecycle.completedAt,
+      cancelledAt: nextLifecycle.cancelledAt
+    },
+    activeSession
+  );
+  if (!updatedOrder) {
+    throw new InternalServerError('ไม่พบคำสั่งซื้อหลังจากอัปเดต');
+  }
+
+  return { updatedOrder, orderItems, totalAmount };
+};
+
+const generateAndPersistDeliveryNote = async (
+  order: Order,
+  orderItems: Awaited<ReturnType<typeof orderItemRepository.listByOrderId>>,
+  activeSession: ClientSession
+) => {
+  const preparedDeliveryNote = await createPreparedDeliveryNote(order, orderItems, activeSession);
+  const completedOrder = await persistDeliveryNoteOnOrder(order, preparedDeliveryNote.documentNumber, activeSession);
+  await uploadObjectToBucket(
+    correctionDepartmentBucketName,
+    `DN/${preparedDeliveryNote.pdf.filename}`,
+    preparedDeliveryNote.pdf.bytes,
+    preparedDeliveryNote.pdf.contentType
+  );
+
+  return { completedOrder, documentNumber: preparedDeliveryNote.documentNumber };
+};
+
+// Normal flow: order was in draft. It either stays a draft, or is completed for the first
+// time (no delivery note/credit exist yet, so both are created fresh).
+const updateDraftOrder = async (
+  id: string,
+  existingOrder: Order,
+  input: Partial<CreateOrderInput>,
+  activeSession: ClientSession
+) => {
+  const nextStatus = input.status ?? 'draft';
+  const nextLifecycle = getOrderLifecycleFields(nextStatus);
+  const { updatedOrder, orderItems, totalAmount } = await applyOrderFieldUpdates(
+    id,
+    existingOrder,
+    input,
+    nextLifecycle,
+    activeSession
+  );
+
+  if (nextStatus === 'draft') {
+    log.info({ orderId: id, status: 'draft', totalAmount }, 'order updated');
+    return { order: updatedOrder, orderItems };
+  }
+
+  const { completedOrder, documentNumber } = await generateAndPersistDeliveryNote(
+    updatedOrder,
+    orderItems,
+    activeSession
+  );
+  const credit = await getOrderCreditPort().createCreditForOrder({ ...completedOrder, totalAmount }, activeSession);
+
+  log.info({ orderId: id, status: 'completed', totalAmount, deliveryNote: documentNumber }, 'order updated');
+  return { order: completedOrder, orderItems, credit };
+};
+
+// Completed DN flow: order was already completed (and, per the editable check above, not yet
+// billed). Downgrading back to draft is not supported here. Items/customer/dates are
+// recalculated as usual, then the delivery note PDF is regenerated (same document number, so
+// it overwrites the old file in the bucket) and the credit is replaced to reflect the new
+// total, with completedAt bumped to the time of this edit.
+const updateCompletedOrder = async (
+  id: string,
+  existingOrder: Order,
+  input: Partial<CreateOrderInput>,
+  activeSession: ClientSession
+) => {
+  if (input.status !== 'completed') {
+    throw new BadRequestError('ไม่สามารถเปลี่ยนคำสั่งซื้อที่เสร็จสิ้นแล้วกลับเป็นฉบับร่างได้');
+  }
+
+  const nextLifecycle = getOrderLifecycleFields('completed');
+  const { updatedOrder, orderItems, totalAmount } = await applyOrderFieldUpdates(
+    id,
+    existingOrder,
+    input,
+    nextLifecycle,
+    activeSession
+  );
+
+  const { completedOrder, documentNumber } = await generateAndPersistDeliveryNote(
+    updatedOrder,
+    orderItems,
+    activeSession
+  );
+
+  await getOrderCreditPort().removeCreditsForOrder(id, activeSession);
+  const credit = await getOrderCreditPort().createCreditForOrder({ ...completedOrder, totalAmount }, activeSession);
+
+  log.info(
+    { orderId: id, status: 'completed', totalAmount, deliveryNote: documentNumber },
+    'completed order updated'
+  );
+  return { order: completedOrder, orderItems, credit };
 };
 
 export const orderService = {
@@ -350,93 +508,9 @@ export const orderService = {
         throw new BadRequestError('ไม่สามารถแก้ไขคำสั่งซื้อนี้ได้ เนื่องจากถูกใช้สร้างใบวางบิลแล้ว');
       }
 
-      const nextStatus = input.status ?? getPersistedOrderStatus(existingOrder);
-      const nextLifecycle = getOrderLifecycleFields(nextStatus);
-      const nextCustomerId = input.customerId ?? existingOrder.customerId.toString();
-      const customerSnapshot =
-        nextCustomerId === existingOrder.customerId.toString()
-          ? {
-              customerId: existingOrder.customerId,
-              customerBillName: existingOrder.customerBillName,
-              customerBillAddress: existingOrder.customerBillAddress
-            }
-          : await getCustomerBillingSnapshot(nextCustomerId, activeSession);
-      const nextDueDate = input.dueDate ?? existingOrder.dueDate;
-      const nextDeliveryDate = input.deliveryDate ?? existingOrder.deliveryDate;
-      const nextCustomerDepartment = input.customerDepartment ?? existingOrder.customerDepartment;
-      const nextMaterialCategory = input.materialCategory ?? existingOrder.materialCategory;
-
-      let orderItems = input.items
-        ? await (async () => {
-            await orderItemRepository.hardDeleteByOrderId(id, activeSession);
-            return orderItemRepository.createMany(id, input.items!, nextLifecycle, activeSession);
-          })()
-        : await orderItemRepository.listByOrderId(id, activeSession);
-
-      if (orderItems.length === 0) {
-        throw new BadRequestError('คำสั่งซื้อต้องมีอย่างน้อย 1 รายการ');
-      }
-
-      if (!input.items && nextStatus === 'completed') {
-        orderItems = await orderItemRepository.updateLifecycleByOrderId(id, nextLifecycle, activeSession);
-      }
-
-      const totalAmount = orderItems
-        .reduce((total, item) => total.add(new Currency(item.totalSellPrice)), new Currency(0))
-        .toNumber();
-      const totalExpense = orderItems
-        .reduce((total, item) => total.add(new Currency(item.totalBuyPrice)), new Currency(0))
-        .toNumber();
-      const updatedOrder = await orderRepository.update(
-        id,
-        {
-          customerId: customerSnapshot.customerId,
-          customerBillName: customerSnapshot.customerBillName,
-          customerBillAddress: customerSnapshot.customerBillAddress,
-          customerDepartment: nextCustomerDepartment,
-          materialCategory: nextMaterialCategory,
-          totalAmount,
-          totalExpense,
-          dueDate: nextDueDate,
-          deliveryDate: nextDeliveryDate,
-          completedAt: nextLifecycle.completedAt,
-          cancelledAt: nextLifecycle.cancelledAt
-        },
-        activeSession
-      );
-      if (!updatedOrder) {
-        throw new InternalServerError('ไม่พบคำสั่งซื้อหลังจากอัปเดต');
-      }
-
-      if (nextStatus === 'draft') {
-        log.info({ orderId: id, status: 'draft', totalAmount }, 'order updated');
-        return { order: updatedOrder, orderItems };
-      }
-
-      const existingCredit = await getOrderCreditPort().getCreditByOrderId(id, activeSession);
-      if (existingCredit) {
-        throw new BadRequestError('คำสั่งซื้อนี้ถูกสรุปแล้ว');
-      }
-
-      const preparedDeliveryNote = await createPreparedDeliveryNote(updatedOrder, orderItems, activeSession);
-      const completedOrder = await persistDeliveryNoteOnOrder(
-        updatedOrder,
-        preparedDeliveryNote.documentNumber,
-        activeSession
-      );
-      const credit = await getOrderCreditPort().createCreditForOrder({ ...completedOrder, totalAmount }, activeSession);
-      await uploadObjectToBucket(
-        correctionDepartmentBucketName,
-        `DN/${preparedDeliveryNote.pdf.filename}`,
-        preparedDeliveryNote.pdf.bytes,
-        preparedDeliveryNote.pdf.contentType
-      );
-
-      log.info(
-        { orderId: id, status: 'completed', totalAmount, deliveryNote: preparedDeliveryNote.documentNumber },
-        'order updated'
-      );
-      return { order: completedOrder, orderItems, credit };
+      return existingOrder.completedAt
+        ? updateCompletedOrder(id, existingOrder, input, activeSession)
+        : updateDraftOrder(id, existingOrder, input, activeSession);
     };
 
     return withSession(session, run);
