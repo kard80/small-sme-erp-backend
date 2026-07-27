@@ -1,6 +1,6 @@
 import mongoose, { ClientSession, Schema, model, models } from 'mongoose';
 import { logger } from './logger';
-import { Customer, Order, OrderItem, OrderOcrUploadBatch, Product, ProductStatus } from './types';
+import { Customer, Order, OrderItem, Product, ProductStatus } from './types';
 
 mongoose.set('strictQuery', true);
 
@@ -22,7 +22,6 @@ export const collectionNames = {
   customer: 'customers',
   order: 'orders',
   orderItem: 'order_items',
-  orderOcrUploadBatch: 'order_ocr_upload_batches',
   counter: 'counters'
 } as const;
 
@@ -81,12 +80,6 @@ const orderItemSchema = createBaseSchema<OrderItem>({
     completedAt: { type: Date, required: false, default: null }
 });
 
-const orderOcrUploadBatchSchema = createBaseSchema<OrderOcrUploadBatch>({
-    folderName: { type: String, required: true, trim: true },
-    filenames: { type: [String], required: true },
-    objectKeys: { type: [String], required: true }
-});
-
 const counterSchema = createBaseSchema({
     key: { type: String, required: true, unique: true },
     value: { type: Number, required: true, default: 0 }
@@ -97,9 +90,6 @@ export const CustomerModel = models.Customer || model<Customer>('Customer', cust
 export const OrderModel = models.Order || model<Order>('Order', orderSchema, collectionNames.order);
 export const OrderItemModel =
   models.OrderItem || model<OrderItem>('OrderItem', orderItemSchema, collectionNames.orderItem);
-export const OrderOcrUploadBatchModel =
-  models.OrderOcrUploadBatch ||
-  model<OrderOcrUploadBatch>('OrderOcrUploadBatch', orderOcrUploadBatchSchema, collectionNames.orderOcrUploadBatch);
 const CounterModel = models.Counter || model('Counter', counterSchema, collectionNames.counter);
 
 let initPromise: Promise<void> | undefined;

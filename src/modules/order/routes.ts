@@ -1,12 +1,7 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
 import { parseObjectIdParam, paginationSchema, sendZodError } from '../../shared/http';
-import {
-  orderImageOcrInputSchema,
-  orderInputSchema,
-  orderOcrUploadBatchInputSchema,
-  orderUpdateSchema
-} from './schemas';
+import { orderInputSchema, orderUpdateSchema } from './schemas';
 import { orderService } from './service';
 import { Pagination } from '../../shared/pagination';
 import { ComparableFilter } from '../../shared/filters';
@@ -92,24 +87,6 @@ export const createOrderRouter = () => {
     }
 
     return res.json(order);
-  });
-
-  router.post('/ocr', async (req, res) => {
-    const input = orderImageOcrInputSchema.safeParse(req.body);
-    if (!input.success) {
-      return sendZodError(res, input.error);
-    }
-
-    return res.json(await orderService.parseOrderImageUrls(input.data.imageUrls));
-  });
-
-  router.post('/ocr/upload', async (req, res) => {
-    const input = orderOcrUploadBatchInputSchema.safeParse(req.body);
-    if (!input.success) {
-      return sendZodError(res, input.error);
-    }
-
-    return res.status(201).json(await orderService.createOcrUploadBatch(input.data.filenames));
   });
 
   router.patch('/:id', async (req, res) => {

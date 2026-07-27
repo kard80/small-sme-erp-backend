@@ -1,7 +1,7 @@
 import { ClientSession } from 'mongoose';
 import moment from '../../../shared/moment';
-import { OrderModel, OrderOcrUploadBatchModel } from '../../../shared/persistence';
-import { EntityPatch, NewEntity, Order, OrderOcrUploadBatch } from '../../../shared/types';
+import { OrderModel } from '../../../shared/persistence';
+import { EntityPatch, NewEntity, Order } from '../../../shared/types';
 import { pickDefined } from '../../../shared/utils';
 import { ListOrdersProps } from '../types';
 import { ComparableFilter } from '../../../shared/filters';
@@ -61,25 +61,6 @@ export const orderRepository = {
     )
       .lean<Order | null>()
       .session(session ?? null);
-  },
-
-  async createOcrUploadBatch(
-    input: Pick<OrderOcrUploadBatch, 'folderName' | 'filenames' | 'objectKeys' | 'createdAt'>,
-    session?: ClientSession
-  ) {
-    const [batch] = await OrderOcrUploadBatchModel.create(
-      [
-        {
-          folderName: input.folderName,
-          filenames: input.filenames,
-          objectKeys: input.objectKeys,
-          createdAt: input.createdAt
-        }
-      ],
-      { session }
-    );
-
-    return batch.toObject();
   },
 
   remove(_id: string, session?: ClientSession) {

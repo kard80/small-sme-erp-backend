@@ -55,13 +55,6 @@ export interface OrderItem extends MongoEntity {
   completedAt?: Date | null;
 }
 
-export interface OrderOcrUploadBatch extends MongoEntity {
-  folderName: string;
-  filenames: string[];
-  objectKeys: string[];
-  createdAt: Date;
-}
-
 export interface CreateOrderInput {
   customerId: string;
   customerDepartment?: string;

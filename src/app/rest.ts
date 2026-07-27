@@ -4,7 +4,6 @@ import pinoHttp from 'pino-http';
 import { assertDbReady } from '../shared/persistence';
 import { fallbackErrorHandler } from '../shared/http';
 import { logger } from '../shared/logger';
-import { isOpenAiConfigured } from '../shared/openai';
 import { requireAuth } from '../modules/auth/middleware';
 import { createAuthRouter } from '../modules/auth/routes';
 import { createProductRouter } from '../modules/product/routes';
@@ -31,12 +30,7 @@ export const createRestApp = () => {
   app.get('/health', (_req, res) => {
     res.json({
       ok: true,
-      server: 'rest',
-      integrations: {
-        openai: {
-          configured: isOpenAiConfigured()
-        }
-      }
+      server: 'rest'
     });
   });
 
