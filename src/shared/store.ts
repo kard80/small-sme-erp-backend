@@ -1,24 +1,18 @@
-import { Customer, CustomerCredit, Order, PaymentTransaction, Product } from './types';
+import { Customer, Order, Product } from './types';
 
 export const db = {
   products: [] as Product[],
   customers: [] as Customer[],
-  orders: [] as Order[],
-  customerCredits: [] as CustomerCredit[],
-  financials: [] as PaymentTransaction[]
+  orders: [] as Order[]
 };
 
 let productSeq = 1;
 let customerSeq = 1;
 let orderSeq = 1;
-let creditSeq = 1;
-let financialSeq = 1;
 
 export const nextProductId = () => productSeq++;
 export const nextCustomerId = () => customerSeq++;
 export const nextOrderId = () => orderSeq++;
-export const nextCreditId = () => creditSeq++;
-export const nextFinancialId = () => financialSeq++;
 
 export const paginate = <T>(items: T[], page: number, pageSize: number) => {
   const start = (page - 1) * pageSize;
@@ -35,11 +29,7 @@ export const resetInMemoryStore = () => {
   db.products.length = 0;
   db.customers.length = 0;
   db.orders.length = 0;
-  db.customerCredits.length = 0;
-  db.financials.length = 0;
   productSeq = 1;
   customerSeq = 1;
   orderSeq = 1;
-  creditSeq = 1;
-  financialSeq = 1;
 };

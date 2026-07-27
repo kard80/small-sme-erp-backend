@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 
-export type CreditStatus = 'pending' | 'partial' | 'paid' | 'cancelled';
 export type ProductStatus = 'active' | 'inactive';
 export type CreateOrderStatus = 'draft' | 'completed';
 
@@ -55,26 +54,6 @@ export interface OrderItem extends MongoEntity {
   totalBuyPrice: number;
   completedAt?: Date | null;
 }
-
-export interface CustomerCredit extends MongoEntity {
-  orderId: Types.ObjectId;
-  customerId: Types.ObjectId;
-  deliveryNote?: string;
-  customerBillName: string;
-  dueDate: Date;
-  totalAmount: number;
-  paidAmount: number;
-  status: CreditStatus;
-}
-
-export interface PaymentTransaction extends MongoEntity {
-  customerCreditId: string;
-  amount: number;
-  paymentDate: Date;
-  note?: string;
-}
-
-export type FinancialTransaction = PaymentTransaction;
 
 export interface OrderOcrUploadBatch extends MongoEntity {
   folderName: string;

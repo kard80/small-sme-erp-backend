@@ -1,16 +1,6 @@
 import mongoose, { ClientSession, Schema, model, models } from 'mongoose';
 import { logger } from './logger';
-import {
-  CreditStatus,
-  Customer,
-  CustomerCredit,
-  Order,
-  OrderItem,
-  OrderOcrUploadBatch,
-  PaymentTransaction,
-  Product,
-  ProductStatus
-} from './types';
+import { Customer, Order, OrderItem, OrderOcrUploadBatch, Product, ProductStatus } from './types';
 
 mongoose.set('strictQuery', true);
 
@@ -32,8 +22,6 @@ export const collectionNames = {
   customer: 'customers',
   order: 'orders',
   orderItem: 'order_items',
-  customerCredit: 'customer_credits',
-  paymentTransaction: 'payment_transactions',
   orderOcrUploadBatch: 'order_ocr_upload_batches',
   counter: 'counters'
 } as const;
@@ -64,8 +52,6 @@ const customerSchema = createBaseSchema<Customer>({
     billName: { type: String, required: true, trim: true }
 });
 
-const creditStatusValues: CreditStatus[] = ['pending', 'partial', 'paid', 'cancelled'];
-
 const orderSchema = createBaseSchema<Order>({
     customerId: { type: Schema.Types.ObjectId, required: true, index: true },
     customerBillName: { type: String, required: true, trim: true },
@@ -81,17 +67,6 @@ const orderSchema = createBaseSchema<Order>({
     cancelledAt: { type: Date, required: false, default: null }
 });
 
-const customerCreditSchema = createBaseSchema<CustomerCredit>({
-    orderId: { type: Schema.Types.ObjectId, required: true, index: true },
-    customerId: { type: Schema.Types.ObjectId, required: true, index: true },
-    deliveryNote: { type: String, required: false, trim: true },
-    customerBillName: { type: String, required: true, trim: true },
-    dueDate: { type: Date, required: true },
-    totalAmount: { type: Number, required: true, min: 0 },
-    paidAmount: { type: Number, required: true, min: 0 },
-    status: { type: String, required: true, enum: creditStatusValues }
-});
-
 const orderItemSchema = createBaseSchema<OrderItem>({
     orderId: { type: Schema.Types.ObjectId, required: true, index: true },
     order: { type: Number, required: true, min: 1 },
@@ -104,13 +79,6 @@ const orderItemSchema = createBaseSchema<OrderItem>({
     totalSellPrice: { type: Number, required: true, min: 0 },
     totalBuyPrice: { type: Number, required: true, min: 0 },
     completedAt: { type: Date, required: false, default: null }
-});
-
-const paymentTransactionSchema = createBaseSchema<PaymentTransaction>({
-    customerCreditId: { type: Schema.Types.ObjectId, required: true, index: true },
-    amount: { type: Number, required: true, min: 0 },
-    paymentDate: { type: Date, required: true },
-    note: { type: String, required: false, trim: true }
 });
 
 const orderOcrUploadBatchSchema = createBaseSchema<OrderOcrUploadBatch>({
@@ -129,12 +97,6 @@ export const CustomerModel = models.Customer || model<Customer>('Customer', cust
 export const OrderModel = models.Order || model<Order>('Order', orderSchema, collectionNames.order);
 export const OrderItemModel =
   models.OrderItem || model<OrderItem>('OrderItem', orderItemSchema, collectionNames.orderItem);
-export const CustomerCreditModel =
-  models.CustomerCredit ||
-  model<CustomerCredit>('CustomerCredit', customerCreditSchema, collectionNames.customerCredit);
-export const PaymentTransactionModel =
-  models.PaymentTransaction ||
-  model<PaymentTransaction>('PaymentTransaction', paymentTransactionSchema, collectionNames.paymentTransaction);
 export const OrderOcrUploadBatchModel =
   models.OrderOcrUploadBatch ||
   model<OrderOcrUploadBatch>('OrderOcrUploadBatch', orderOcrUploadBatchSchema, collectionNames.orderOcrUploadBatch);

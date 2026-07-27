@@ -3,10 +3,9 @@ import { ClientSession, Types } from 'mongoose';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 import { customersRepository } from '../customers/repository';
-import { financeRepository } from '../finance/repository';
 import { orderItemRepository } from './repository/order-item.repository';
 import { productRepository } from '../product/repository';
-import { CreateOrderInput, CreditStatus, Order } from '../../shared/types';
+import { CreateOrderInput, Order } from '../../shared/types';
 import { BadRequestError, InternalServerError, NotFoundError } from '../../shared/errors';
 import {
   correctionDepartmentBucketName,
@@ -18,27 +17,12 @@ import { runInTransaction, withSession } from '../../shared/persistence';
 import { createOpenAiClient, getOpenAiModel } from '../../shared/openai';
 import { logger } from '../../shared/logger';
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
-import { OrderCreditPort } from './ports';
 import { orderRepository } from './repository/order.repository';
 import { ListOrdersProps, OrderWithEditable } from './types';
 import { Currency } from '../../shared/currency';
 import { billingNoteOrderRepository } from '../billing-note/repository/billing-note-order.repository';
 
 const log = logger.child({ module: 'order' });
-
-let orderCreditPort: OrderCreditPort | undefined;
-
-const getOrderCreditPort = () => {
-  if (!orderCreditPort) {
-    throw new InternalServerError('Order credit port has not been configured');
-  }
-
-  return orderCreditPort;
-};
-
-export const configureOrderPorts = (ports: { credit: OrderCreditPort }) => {
-  orderCreditPort = ports.credit;
-};
 
 const orderOcrSchema = z.object({
   productName: z.string().trim().min(1).nullable(),
@@ -225,7 +209,7 @@ const upsertDeliveryNoteForOrder = async (
 
 // Recomputes items/customer/date fields shared by both the draft and completed-order update
 // flows, persists them, and returns the updated order along with the recalculated totals.
-// Does not touch delivery note or credit records — callers handle those per-flow.
+// Does not touch the delivery note — callers handle that per-flow.
 const applyOrderFieldUpdates = async (
   id: string,
   existingOrder: Order,
@@ -311,7 +295,7 @@ const generateAndPersistDeliveryNote = async (
 };
 
 // Normal flow: order was in draft. It either stays a draft, or is completed for the first
-// time (no delivery note/credit exist yet, so both are created fresh).
+// time (no delivery note exists yet, so it is created fresh).
 const updateDraftOrder = async (
   id: string,
   existingOrder: Order,
@@ -338,17 +322,15 @@ const updateDraftOrder = async (
     orderItems,
     activeSession
   );
-  const credit = await getOrderCreditPort().createCreditForOrder({ ...completedOrder, totalAmount }, activeSession);
 
   log.info({ orderId: id, status: 'completed', totalAmount, deliveryNote: documentNumber }, 'order updated');
-  return { order: completedOrder, orderItems, credit };
+  return { order: completedOrder, orderItems };
 };
 
 // Completed DN flow: order was already completed (and, per the editable check above, not yet
 // billed). Downgrading back to draft is not supported here. Items/customer/dates are
 // recalculated as usual, then the delivery note PDF is regenerated (same document number, so
-// it overwrites the old file in the bucket) and the credit is replaced to reflect the new
-// total, with completedAt bumped to the time of this edit.
+// it overwrites the old file in the bucket), with completedAt bumped to the time of this edit.
 const updateCompletedOrder = async (
   id: string,
   existingOrder: Order,
@@ -374,14 +356,11 @@ const updateCompletedOrder = async (
     activeSession
   );
 
-  await getOrderCreditPort().removeCreditsForOrder(id, activeSession);
-  const credit = await getOrderCreditPort().createCreditForOrder({ ...completedOrder, totalAmount }, activeSession);
-
   log.info(
     { orderId: id, status: 'completed', totalAmount, deliveryNote: documentNumber },
     'completed order updated'
   );
-  return { order: completedOrder, orderItems, credit };
+  return { order: completedOrder, orderItems };
 };
 
 export const orderService = {
@@ -398,7 +377,6 @@ export const orderService = {
 
       const preparedDeliveryNote = await createPreparedDeliveryNote(order, orderItems, session);
       const updatedOrder = await persistDeliveryNoteOnOrder(order, preparedDeliveryNote.documentNumber, session);
-      const credit = await getOrderCreditPort().createCreditForOrder({ ...updatedOrder, totalAmount }, session);
       await uploadObjectToBucket(
         correctionDepartmentBucketName,
         `DN/${preparedDeliveryNote.pdf.filename}`,
@@ -416,7 +394,7 @@ export const orderService = {
         },
         'order created'
       );
-      return { order: updatedOrder, orderItems, credit };
+      return { order: updatedOrder, orderItems };
     });
   },
 
@@ -516,35 +494,6 @@ export const orderService = {
     return withSession(session, run);
   },
 
-  async updateOrderStatusFromCredit(orderId: string, status: CreditStatus, session?: ClientSession) {
-    const order = await orderRepository.findById(orderId, session);
-    if (!order || order.cancelledAt) {
-      return order;
-    }
-
-    if (status === 'cancelled') {
-      return orderRepository.update(orderId, { cancelledAt: new Date() }, session);
-    }
-
-    if (status === 'paid') {
-      return orderRepository.update(orderId, { completedAt: order.completedAt ?? new Date() }, session);
-    }
-
-    return orderRepository.update(orderId, { completedAt: null, cancelledAt: null }, session);
-  },
-
-  async resetOrderStatusAfterCreditRemoval(orderId: string, session?: ClientSession) {
-    const order = await orderRepository.findById(orderId, session);
-    if (!order) {
-      return undefined;
-    }
-    if (order.cancelledAt) {
-      return order;
-    }
-
-    return orderRepository.update(orderId, { completedAt: null, cancelledAt: null }, session);
-  },
-
   async getSummary(startDate?: string, endDate?: string) {
     const round2 = (n: number) => Math.round(n * 100) / 100;
     const { revenue, expenses } = await orderRepository.getSummary(startDate, endDate);
@@ -559,10 +508,8 @@ export const orderService = {
       }
 
       const orderItems = await orderItemRepository.removeByOrderId(order._id.toString(), session);
-      const credits = await getOrderCreditPort().removeCreditsForOrder(order._id.toString(), session);
-      await Promise.all(credits.map((credit) => financeRepository.removeByCreditId(credit._id.toString(), session)));
-      log.info({ orderId: id, itemCount: orderItems.length, creditCount: credits.length }, 'order removed');
-      return { order, orderItems, credits };
+      log.info({ orderId: id, itemCount: orderItems.length }, 'order removed');
+      return { order, orderItems };
     });
   },
 

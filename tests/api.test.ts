@@ -6,10 +6,8 @@ import {
   initiateDb,
   disconnectPersistence,
   CustomerModel,
-  CustomerCreditModel,
   OrderItemModel,
   OrderModel,
-  PaymentTransactionModel,
   ProductModel
 } from '../src/shared/persistence';
 import { createRestApp } from '../src/restApp';
@@ -82,8 +80,6 @@ describeIfMongo('ERP backend', () => {
     await Promise.all([
       CustomerModel.deleteMany({}),
       ProductModel.deleteMany({}),
-      PaymentTransactionModel.deleteMany({}),
-      CustomerCreditModel.deleteMany({}),
       OrderItemModel.deleteMany({}),
       OrderModel.deleteMany({})
     ]);
@@ -113,7 +109,6 @@ describeIfMongo('ERP backend', () => {
       totalSellPrice: 150,
       totalBuyPrice: 100
     });
-    expect(response.body.credit).toBeUndefined();
     expect(response.body.deliveryNote).toBeUndefined();
   });
 
@@ -150,7 +145,7 @@ describeIfMongo('ERP backend', () => {
     });
   });
 
-  it('creates a completed order with credit and delivery note', async () => {
+  it('creates a completed order with delivery note', async () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
@@ -160,12 +155,6 @@ describeIfMongo('ERP backend', () => {
     expect(response.body.order.completedAt).toEqual(expect.any(String));
     expect(response.body.order.deliveryNote).toMatch(/^DN\d{8}$/);
     expect(response.body.orderItems).toHaveLength(1);
-    expect(response.body.credit.totalAmount).toBe(150);
-    expect(response.body.credit.customerBillName).toBe(response.body.order.customerBillName);
-    expect(response.body.credit.dueDate).toBe('2026-06-30');
-    expect(response.body.credit.deliveryNote).toBe(response.body.order.deliveryNote);
-    expect(response.body.credit.status).toBe('pending');
-    expect(response.body.credit.paidAmount).toBe(0);
     expect(response.body.deliveryNote).toBeUndefined();
   });
 
@@ -205,7 +194,6 @@ describeIfMongo('ERP backend', () => {
     expect(response.body.order.customerId).toBe(99);
     expect(response.body.order.dueDate).toBe('2026-06-30');
     expect(response.body.order.deliveryDate).toBe('2026-06-20');
-    expect(response.body.credit).toBeUndefined();
     expect(response.body.orderItems).toHaveLength(2);
     expect(response.body.orderItems[0]).toMatchObject({
       order: 1,
@@ -313,12 +301,9 @@ describeIfMongo('ERP backend', () => {
       totalBuyPrice: 160,
       completedAt: null
     });
-
-    const creditCount = await CustomerCreditModel.countDocuments({ orderId: created.body.order._id });
-    expect(creditCount).toBe(0);
   });
 
-  it('patches a draft order to completed and creates credit and delivery note', async () => {
+  it('patches a draft order to completed and creates a delivery note', async () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
@@ -346,14 +331,6 @@ describeIfMongo('ERP backend', () => {
     expect(updated.body.order.deliveryNote).toMatch(/^DN\d{8}$/);
     expect(updated.body.orderItems).toHaveLength(1);
     expect(updated.body.orderItems[0].completedAt).toEqual(expect.any(String));
-    expect(updated.body.credit).toMatchObject({
-      totalAmount: 420,
-      paidAmount: 0,
-      status: 'pending',
-      customerBillName: updated.body.order.customerBillName,
-      dueDate: '2026-06-30',
-      deliveryNote: updated.body.order.deliveryNote
-    });
     expect(updated.body.deliveryNote).toBeUndefined();
   });
 
@@ -599,71 +576,6 @@ describeIfMongo('ERP backend', () => {
     ).toEqual([['Widget A', 'pcs', 100, 150, 'active']]);
   });
 
-  it('creates a paid credit when the order starts completed', async () => {
-    const app = createRestApp();
-    const { accessToken } = await loginAsAdmin(app);
-
-    const response = await createOrder(app, accessToken, {
-      status: 'completed',
-      items: [
-        {
-          productId: testProductId,
-          productName: 'Widget A',
-          unit: 'pcs',
-          quantity: 1,
-          buyPrice: 100,
-          sellPrice: 225
-        }
-      ]
-    });
-
-    expect(response.status).toBe(201);
-    expect(response.body.order.completedAt).toEqual(expect.any(String));
-    expect(response.body.credit.totalAmount).toBe(225);
-    expect(response.body.credit.paidAmount).toBe(0);
-    expect(response.body.credit.status).toBe('pending');
-  });
-
-  it('supports partial and full payment in financial transactions', async () => {
-    const app = createRestApp();
-    const { accessToken } = await loginAsAdmin(app);
-
-    const created = await createOrder(app, accessToken, { status: 'completed' });
-
-    const creditId = created.body.credit._id;
-
-    const partial = await request(app)
-      .post('/api/v1/finances/payments')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        customerCreditId: creditId,
-        amount: 50,
-        paymentDate: '2026-06-01'
-      });
-
-    expect(partial.status).toBe(201);
-    const pendingCredit = await CustomerCreditModel.findOne({ _id: creditId }).lean();
-    expect(pendingCredit?.status).toBe('partial');
-    expect(pendingCredit?.paidAmount).toBe(50);
-
-    const complete = await request(app)
-      .post('/api/v1/finances/payments')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        customerCreditId: creditId,
-        amount: 100,
-        paymentDate: '2026-06-02'
-      });
-
-    expect(complete.status).toBe(201);
-    const [paidCredit, completedOrder] = await Promise.all([
-      CustomerCreditModel.findOne({ _id: creditId }).lean(),
-      OrderModel.findOne({ _id: created.body.order._id }).lean()
-    ]);
-    expect(paidCredit?.status).toBe('paid');
-    expect(completedOrder?.completedAt).toEqual(expect.any(String));
-  });
-
   it('authenticates REST requests with access and refresh tokens', async () => {
     const app = createRestApp();
 
@@ -711,178 +623,19 @@ describeIfMongo('ERP backend', () => {
     expect(logoutWithoutToken.status).toBe(401);
   });
 
-  it('deletes an order with linked customer credit and payments', async () => {
+  it('deletes an order and its items', async () => {
     const app = createRestApp();
     const { accessToken } = await loginAsAdmin(app);
 
     const created = await createOrder(app, accessToken, { status: 'completed' });
-
-    await request(app)
-      .post('/api/v1/finances/payments')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        customerCreditId: created.body.credit._id,
-        amount: 50,
-        paymentDate: '2026-06-01'
-      });
 
     const removed = await request(app)
       .delete(`/api/v1/orders/${created.body.order._id}`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(removed.status).toBe(204);
-    const [ordersCount, credit, paymentsCount] = await Promise.all([
-      OrderModel.countDocuments(),
-      CustomerCreditModel.findOne({ _id: created.body.credit._id }).lean(),
-      PaymentTransactionModel.countDocuments()
-    ]);
+    const ordersCount = await OrderModel.countDocuments();
     expect(ordersCount).toBe(0);
-    expect(credit?.deletedAt).toEqual(expect.any(Date));
-    expect(paymentsCount).toBe(0);
-  });
-
-  it('rejects payments against cancelled customer credit', async () => {
-    const app = createRestApp();
-    const { accessToken } = await loginAsAdmin(app);
-
-    const created = await request(app)
-      .post('/api/v1/credits/customer-credits')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        orderId: new Types.ObjectId().toString(),
-        customerId: new Types.ObjectId().toString(),
-        customerBillName: 'Cancelled Credit Billing',
-        dueDate: '2026-06-30',
-        deliveryNote: 'DN20260630',
-        totalAmount: 150,
-        paidAmount: 0,
-        status: 'cancelled'
-      });
-
-    const payment = await request(app)
-      .post('/api/v1/finances/payments')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        customerCreditId: created.body._id,
-        amount: 50,
-        paymentDate: '2026-06-01'
-      });
-
-    expect(payment.status).toBe(400);
-    expect(payment.body.error).toBe('Cannot pay cancelled customer credit');
-  });
-
-  it('recomputes credit and order status when replacing or removing a payment', async () => {
-    const app = createRestApp();
-    const { accessToken } = await loginAsAdmin(app);
-
-    const created = await createOrder(app, accessToken, { status: 'completed' });
-    const creditId = created.body.credit._id;
-    const orderId = created.body.order._id;
-
-    const paid = await request(app)
-      .post('/api/v1/finances/payments')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        customerCreditId: creditId,
-        amount: 150,
-        paymentDate: '2026-06-01'
-      });
-
-    expect(paid.status).toBe(201);
-
-    const replaced = await request(app)
-      .patch(`/api/v1/finances/payments/${paid.body._id}`)
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        customerCreditId: creditId,
-        amount: 50,
-        paymentDate: '2026-06-02'
-      });
-
-    expect(replaced.status).toBe(200);
-
-    let [credit, order] = await Promise.all([
-      CustomerCreditModel.findOne({ _id: creditId }).lean(),
-      OrderModel.findOne({ _id: orderId }).lean()
-    ]);
-    expect(credit?.paidAmount).toBe(50);
-    expect(credit?.status).toBe('partial');
-    expect(order?.completedAt).toBeNull();
-    expect(order?.cancelledAt).toBeNull();
-
-    const removed = await request(app)
-      .delete(`/api/v1/finances/payments/${paid.body._id}`)
-      .set('Authorization', `Bearer ${accessToken}`);
-
-    expect(removed.status).toBe(204);
-
-    [credit, order] = await Promise.all([
-      CustomerCreditModel.findOne({ _id: creditId }).lean(),
-      OrderModel.findOne({ _id: orderId }).lean()
-    ]);
-    expect(credit?.paidAmount).toBe(0);
-    expect(credit?.status).toBe('pending');
-    expect(order?.completedAt).toBeNull();
-    expect(order?.cancelledAt).toBeNull();
-  });
-
-  it('updates the linked order when patching a customer credit', async () => {
-    const app = createRestApp();
-    const { accessToken } = await loginAsAdmin(app);
-
-    const created = await createOrder(app, accessToken, { status: 'completed' });
-    const creditId = created.body.credit._id;
-    const orderId = created.body.order._id;
-
-    const updated = await request(app)
-      .patch(`/api/v1/credits/customer-credits/${creditId}`)
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        paidAmount: 150
-      });
-
-    expect(updated.status).toBe(200);
-    expect(updated.body.status).toBe('paid');
-
-    const order = await OrderModel.findOne({ _id: orderId }).lean();
-    expect(order?.completedAt).toEqual(expect.any(String));
-  });
-
-  it('resets the linked order and removes payments when deleting a customer credit', async () => {
-    const app = createRestApp();
-    const { accessToken } = await loginAsAdmin(app);
-
-    const created = await createOrder(app, accessToken, { status: 'completed' });
-    const creditId = created.body.credit._id;
-    const orderId = created.body.order._id;
-
-    const paid = await request(app)
-      .post('/api/v1/finances/payments')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        customerCreditId: creditId,
-        amount: 150,
-        paymentDate: '2026-06-01'
-      });
-
-    expect(paid.status).toBe(201);
-
-    const removed = await request(app)
-      .delete(`/api/v1/credits/customer-credits/${creditId}`)
-      .set('Authorization', `Bearer ${accessToken}`);
-
-    expect(removed.status).toBe(204);
-
-    const [credit, order, paymentsCount] = await Promise.all([
-      CustomerCreditModel.findOne({ _id: creditId }).lean(),
-      OrderModel.findOne({ _id: orderId }).lean(),
-      PaymentTransactionModel.countDocuments({ customerCreditId: creditId })
-    ]);
-    expect(credit).toBeNull();
-    expect(order?.completedAt).toBeNull();
-    expect(order?.cancelledAt).toBeNull();
-    expect(paymentsCount).toBe(0);
   });
 
 });
