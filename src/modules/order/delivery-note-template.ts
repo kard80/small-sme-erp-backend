@@ -252,7 +252,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
       thead th {
         padding: 4px 12px;
         text-align: left;
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 600;
         background: var(--bg-head);
         border: 1px solid var(--border);
@@ -263,6 +263,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         vertical-align: top;
         border: 1px solid var(--border);
         background: white;
+        font-size: 14px;
         line-height: 1.2;
       }
 
