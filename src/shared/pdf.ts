@@ -11,7 +11,12 @@ const defaultPdfOptions = {
   }
 };
 
-export const renderHtmlToPdf = async (html: string) => {
+export interface RenderHtmlToPdfOptions {
+  headerTemplate?: string;
+  footerTemplate?: string;
+}
+
+export const renderHtmlToPdf = async (html: string, options: RenderHtmlToPdfOptions = {}) => {
   const browser = await chromium.launch({
     headless: true,
     executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
@@ -26,7 +31,21 @@ export const renderHtmlToPdf = async (html: string) => {
       await document.fonts.ready;
     });
 
-    const pdfBytes = await page.pdf(defaultPdfOptions);
+    const { headerTemplate, footerTemplate } = options;
+    const pdfOptions = headerTemplate || footerTemplate
+      ? {
+          ...defaultPdfOptions,
+          displayHeaderFooter: true,
+          headerTemplate: headerTemplate ?? '<div></div>',
+          footerTemplate: footerTemplate ?? '<div></div>',
+          margin: {
+            ...defaultPdfOptions.margin,
+            top: headerTemplate ? '20mm' : defaultPdfOptions.margin.top
+          }
+        }
+      : defaultPdfOptions;
+
+    const pdfBytes = await page.pdf(pdfOptions);
     return Buffer.from(pdfBytes);
   } finally {
     await browser.close();
