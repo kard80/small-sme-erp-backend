@@ -32,6 +32,28 @@ const assetsRoot = resolve(__dirname, '../../../assets/fonts');
 const latinFontBase64 = readFileSync(resolve(assetsRoot, 'noto-sans-thai-latin-400-normal.woff2')).toString('base64');
 const thaiFontBase64 = readFileSync(resolve(assetsRoot, 'noto-sans-thai-thai-400-normal.woff2')).toString('base64');
 
+// Exposed so callers can embed the same Thai-capable font into content that is
+// rendered outside this document's own <style>, e.g. Playwright/Puppeteer's
+// page.pdf headerTemplate/footerTemplate, which render in an isolated frame
+// with no access to the main page's @font-face rules.
+export const deliveryNoteFontFaceCss = `
+  @font-face {
+    font-family: 'DeliveryNoteThai';
+    src: url(data:font/woff2;base64,${latinFontBase64}) format('woff2');
+    font-style: normal;
+    font-weight: 400;
+    unicode-range: U+0000-00FF, U+2000-206F;
+  }
+
+  @font-face {
+    font-family: 'DeliveryNoteThai';
+    src: url(data:font/woff2;base64,${thaiFontBase64}) format('woff2');
+    font-style: normal;
+    font-weight: 400;
+    unicode-range: U+0E00-0E7F;
+  }
+`;
+
 export const escapeHtml = (value: string) =>
   value
     .replace(/&/g, '&amp;')
@@ -87,21 +109,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
     <meta charset="utf-8" />
     <title>${escapeHtml(`${documentNumber}.pdf`)}</title>
     <style>
-      @font-face {
-        font-family: 'DeliveryNoteThai';
-        src: url(data:font/woff2;base64,${latinFontBase64}) format('woff2');
-        font-style: normal;
-        font-weight: 400;
-        unicode-range: U+0000-00FF, U+2000-206F;
-      }
-
-      @font-face {
-        font-family: 'DeliveryNoteThai';
-        src: url(data:font/woff2;base64,${thaiFontBase64}) format('woff2');
-        font-style: normal;
-        font-weight: 400;
-        unicode-range: U+0E00-0E7F;
-      }
+      ${deliveryNoteFontFaceCss}
 
       :root {
         color-scheme: light;

@@ -2,7 +2,7 @@ import { ClientSession } from 'mongoose';
 import { nextSequence } from '../../shared/persistence';
 import { renderHtmlToPdf } from '../../shared/pdf';
 import { Order, OrderItem } from '../../shared/types';
-import { buildDeliveryNoteHtml, escapeHtml } from './delivery-note-template';
+import { buildDeliveryNoteHtml, deliveryNoteFontFaceCss, escapeHtml } from './delivery-note-template';
 import { Currency } from '../../shared/currency';
 
 const getDeliveryNoteMonthKey = (date: Date) => {
@@ -27,8 +27,12 @@ export const generateDeliveryNotePdfBuffer = async (
     .reduce((total, item) => total.add(new Currency(item.totalSellPrice)), new Currency(0))
     .toNumber();
   const html = buildDeliveryNoteHtml(order, items, documentNumber, orderTotal);
+  // Puppeteer/Playwright render headerTemplate/footerTemplate in an isolated
+  // frame that has no access to the main document's <style>, so the Thai
+  // font must be embedded again here or "หน้า" renders as tofu boxes.
   const headerTemplate = `
-    <div style="width: 100%; font-size: 9px; color: #666; padding: 0 12mm; box-sizing: border-box; text-align: right; font-family: Arial, sans-serif;">
+    <style>${deliveryNoteFontFaceCss}</style>
+    <div style="width: 100%; font-size: 9px; color: #666; padding: 0 12mm; box-sizing: border-box; text-align: right; font-family: 'DeliveryNoteThai', sans-serif;">
       ${escapeHtml(documentNumber)} &nbsp;&bull;&nbsp; หน้า <span class="pageNumber"></span> / <span class="totalPages"></span>
     </div>
   `;
