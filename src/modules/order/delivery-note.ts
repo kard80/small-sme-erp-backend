@@ -32,7 +32,7 @@ export const generateDeliveryNotePdfBuffer = async (
   // font must be embedded again here or "หน้า" renders as tofu boxes.
   const headerTemplate = `
     <style>${deliveryNoteFontFaceCss}</style>
-    <div style="width: 100%; font-size: 9px; color: #666; padding: 0 12mm; box-sizing: border-box; text-align: right; font-family: 'DeliveryNoteThai', sans-serif;">
+    <div style="width: 100%; font-size: 9px; color: #333; font-weight: 700; padding: 0 12mm; box-sizing: border-box; text-align: right; font-family: 'DeliveryNoteThai', sans-serif;">
       ${escapeHtml(documentNumber)} &nbsp;&bull;&nbsp; หน้า <span class="pageNumber"></span> / <span class="totalPages"></span>
     </div>
   `;
