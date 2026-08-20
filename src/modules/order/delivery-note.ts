@@ -1,6 +1,7 @@
 import { ClientSession } from 'mongoose';
 import { nextSequence } from '../../shared/persistence';
 import { renderHtmlToPdf } from '../../shared/pdf';
+import { BadRequestError } from '../../shared/errors';
 import { Order, OrderItem } from '../../shared/types';
 import { buildDeliveryNoteHtml, deliveryNoteFontFaceCss, escapeHtml } from './delivery-note-template';
 import { Currency } from '../../shared/currency';
@@ -11,10 +12,46 @@ const getDeliveryNoteMonthKey = (date: Date) => {
   return `${year}${month}`;
 };
 
-export const generateDeliveryNoteNumber = async (session?: ClientSession, date = new Date()) => {
+// Customers with a dedicated delivery-note prefix (customer.deliveryNotePrefix) get their own
+// running number sequence, separate from the shared "DN" sequence used by every other customer.
+// Every delivery note's running number is capped at 2 digits (01-99) per calendar month; a 100th
+// delivery note in the same month is rejected rather than silently overflowing to 3 digits.
+const maxDeliveryNoteSequence = 99;
+
+const getDeliveryNoteSequenceConfig = (
+  monthKey: string,
+  customer?: { _id: { toString(): string }; deliveryNotePrefix?: string }
+) => {
+  const prefix = customer?.deliveryNotePrefix?.trim();
+  if (prefix) {
+    return {
+      documentPrefix: prefix,
+      sequenceKey: `deliveryNotes:customer:${customer!._id.toString()}:${monthKey}`
+    };
+  }
+
+  return {
+    documentPrefix: 'DN',
+    sequenceKey: `deliveryNotes:${monthKey}`
+  };
+};
+
+export const generateDeliveryNoteNumber = async (
+  session?: ClientSession,
+  date = new Date(),
+  customer?: { _id: { toString(): string }; deliveryNotePrefix?: string }
+) => {
   const monthKey = getDeliveryNoteMonthKey(date);
-  const sequence = await nextSequence(`deliveryNotes:${monthKey}`, session);
-  return `DN${monthKey}${String(sequence).padStart(2, '0')}`;
+  const { documentPrefix, sequenceKey } = getDeliveryNoteSequenceConfig(monthKey, customer);
+
+  const sequence = await nextSequence(sequenceKey, session);
+  if (sequence > maxDeliveryNoteSequence) {
+    throw new BadRequestError(
+      `เลขที่ใบส่งของในเดือนนี้เกิน ${maxDeliveryNoteSequence} ฉบับแล้ว (เลขที่วิ่ง ${sequence})`
+    );
+  }
+
+  return `${documentPrefix}${monthKey}${String(sequence).padStart(2, '0')}`;
 };
 
 export const generateDeliveryNotePdfBuffer = async (

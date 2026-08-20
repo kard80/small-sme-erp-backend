@@ -87,13 +87,17 @@ const normalizeDeliveryNoteDocumentNumber = (deliveryNote?: string) => {
   return value.replace(/\.pdf$/i, '');
 };
 
-const getDeliveryNoteDocumentNumber = async (order: Pick<Order, 'deliveryNote'>, session?: ClientSession) => {
+const getDeliveryNoteDocumentNumber = async (
+  order: Pick<Order, 'deliveryNote' | 'customerId'>,
+  session?: ClientSession
+) => {
   const existingDocumentNumber = normalizeDeliveryNoteDocumentNumber(order.deliveryNote);
   if (existingDocumentNumber) {
     return existingDocumentNumber;
   }
 
-  return generateDeliveryNoteNumber(session);
+  const customer = await customersRepository.findById(order.customerId.toString(), session);
+  return generateDeliveryNoteNumber(session, undefined, customer ?? undefined);
 };
 
 // TODO: this is called with an active transaction session from createOrder/updateOrder,

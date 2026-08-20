@@ -48,7 +48,8 @@ const productSchema = createBaseSchema<Product>({
 const customerSchema = createBaseSchema<Customer>({
     customerName: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
-    billName: { type: String, required: true, trim: true }
+    billName: { type: String, required: true, trim: true },
+    deliveryNotePrefix: { type: String, required: false, trim: true }
 });
 
 const orderSchema = createBaseSchema<Order>({

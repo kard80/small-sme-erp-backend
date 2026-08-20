@@ -24,6 +24,10 @@ export interface Customer extends MongoEntity {
   customerName: string;
   address: string;
   billName: string;
+  // When set, delivery notes for this customer's orders use this prefix and a running
+  // number sequence dedicated to this customer (format: `{prefix}{YYYYMM}{running}`)
+  // instead of the shared "DN" numbering used by every other customer.
+  deliveryNotePrefix?: string;
 }
 
 export interface Order extends MongoEntity {
