@@ -88,7 +88,7 @@ const normalizeDeliveryNoteDocumentNumber = (deliveryNote?: string) => {
 };
 
 const getDeliveryNoteDocumentNumber = async (
-  order: Pick<Order, 'deliveryNote' | 'customerId'>,
+  order: Pick<Order, 'deliveryNote' | 'customerId' | 'deliveryDate'>,
   session?: ClientSession
 ) => {
   const existingDocumentNumber = normalizeDeliveryNoteDocumentNumber(order.deliveryNote);
@@ -97,7 +97,7 @@ const getDeliveryNoteDocumentNumber = async (
   }
 
   const customer = await customersRepository.findById(order.customerId.toString(), session);
-  return generateDeliveryNoteNumber(session, undefined, customer ?? undefined);
+  return generateDeliveryNoteNumber(session, order.deliveryDate, customer ?? undefined);
 };
 
 // TODO: this is called with an active transaction session from createOrder/updateOrder,
