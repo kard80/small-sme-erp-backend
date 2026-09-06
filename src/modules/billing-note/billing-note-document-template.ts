@@ -138,6 +138,7 @@ export const buildBillingNoteDocumentHtml = (
 
       .document {
         width: 100%;
+        max-width: calc(100% - 4px);
       }
 
       .header {

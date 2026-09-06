@@ -13,6 +13,10 @@ class BillingNoteRepository {
     return BillingNoteModel.findOne({ _id: billingNoteId, deletedAt: null }).lean<BillingNote | null>();
   }
 
+  findByIds(billingNoteIds: string[]) {
+    return BillingNoteModel.find({ _id: { $in: billingNoteIds }, deletedAt: null }).lean<BillingNote[]>();
+  }
+
   async list(startDate: Date, endDate: Date, customerId?: string, pagination: Pagination = new Pagination()) {
     const query = {
       deletedAt: null,

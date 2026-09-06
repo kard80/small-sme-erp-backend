@@ -26,6 +26,12 @@ export class NotFoundError extends HttpError {
   }
 }
 
+export class ConflictError extends HttpError {
+  constructor(message = 'ข้อมูลขัดแย้งกับสถานะปัจจุบัน') {
+    super(message, 409);
+  }
+}
+
 export class InternalServerError extends HttpError {
   constructor(message = 'เกิดข้อผิดพลาดภายในระบบ') {
     super(message, 500);

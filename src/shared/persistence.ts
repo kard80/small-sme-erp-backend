@@ -18,6 +18,8 @@ const baseSchemaOptions = {
 export const collectionNames = {
   billingNote: 'billing_notes',
   billingNoteOrder: 'billing_note_orders',
+  receiptNote: 'receipt_notes',
+  receiptNoteBillingNote: 'receipt_note_billing_notes',
   product: 'products',
   unit: 'units',
   customer: 'customers',

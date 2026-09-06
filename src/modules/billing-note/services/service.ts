@@ -3,13 +3,14 @@ import { orderService } from '../../order/service';
 import { customersRepository } from '../../customers/repository';
 import { ComparableFilter } from '../../../shared/filters';
 import { Pagination } from '../../../shared/pagination';
-import { NotFoundError } from '../../../shared/errors';
+import { NotFoundError, ConflictError } from '../../../shared/errors';
 import { renderHtmlToPdf } from '../../../shared/pdf';
 import { buildBillingNoteDocumentHtml } from '../billing-note-document-template';
 import { Currency } from '../../../shared/currency';
 import { nextSequence, runInTransaction } from '../../../shared/persistence';
 import { billingNoteRepository, CreateBillingNoteInput } from '../repository/billing-note.repository';
 import { billingNoteOrderRepository } from '../repository/billing-note-order.repository';
+import { receiptNoteBillingNoteRepository } from '../../receipt-note/repository/receipt-note-billing-note.repository';
 import { Order } from '../../../types';
 import {
   correctionDepartmentBucketName,
@@ -201,6 +202,11 @@ export const billingNoteService = {
     const billingNote = await billingNoteRepository.findById(billingNoteId);
     if (!billingNote) {
       throw new NotFoundError('ไม่พบใบแจ้งหนี้');
+    }
+
+    const isReceipted = await receiptNoteBillingNoteRepository.isBillingNoteReceipted(billingNoteId);
+    if (isReceipted) {
+      throw new ConflictError('ไม่สามารถลบใบวางบิลที่ออกใบเสร็จแล้ว');
     }
 
     await runInTransaction(async (session) => {

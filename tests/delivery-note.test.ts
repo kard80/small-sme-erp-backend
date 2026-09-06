@@ -61,7 +61,7 @@ describe('delivery note template', () => {
     expect(html).toContain('20 มิถุนายน 2569');
     expect(html).toContain('รวมเงิน');
     expect(html).toContain('table-layout: fixed');
-    expect(html).toContain('grid-template-columns: 96px minmax(0, 1fr);');
+    expect(html).toContain('grid-template-columns: 80px minmax(0, 1fr);');
     expect(html).toContain('บริษัท ตัวอย่าง จำกัด');
     expect(html).toContain('14,814.72');
   });
