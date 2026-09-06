@@ -1,7 +1,7 @@
 import type { ZodIssue } from 'zod';
 import { BadRequestError } from '../../shared/errors';
 import { importProductSchema } from './schemas';
-import { productRepository } from './repository';
+import { productRepository, unitRepository } from './repository';
 import { orderItemService } from '../order/services/order-item';
 import { Pagination } from '../../shared/pagination';
 import moment from 'moment';
@@ -54,6 +54,10 @@ export const productService = {
 
   listProducts(page?: number, pageSize?: number, countZeroBuyPrice?: boolean) {
     return productRepository.list(page, pageSize, countZeroBuyPrice);
+  },
+
+  listUnits() {
+    return unitRepository.list();
   },
 
   searchProducts(query: string) {

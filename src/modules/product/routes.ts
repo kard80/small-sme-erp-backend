@@ -74,6 +74,10 @@ export const createProductRouter = () => {
     return res.json(await productService.listProducts(parsed.data.page, parsed.data.pageSize, countZeroBuyPrice));
   });
 
+  router.get('/units', async (req, res) => {
+    return res.json(await productService.listUnits());
+  });
+
   router.get('/:id', async (req, res) => {
     const { success, error, data } = productOrderHistoryDto.safeParse({ productId: req.params.id, ...req.query });
     if (!success) {

@@ -1,6 +1,6 @@
 import mongoose, { ClientSession, Schema, model, models } from 'mongoose';
 import { logger } from './logger';
-import { Customer, Order, OrderItem, Product, ProductStatus } from './types';
+import { Customer, Order, OrderItem, Product, ProductStatus, Unit } from './types';
 
 mongoose.set('strictQuery', true);
 
@@ -19,6 +19,7 @@ export const collectionNames = {
   billingNote: 'billing_notes',
   billingNoteOrder: 'billing_note_orders',
   product: 'products',
+  unit: 'units',
   customer: 'customers',
   order: 'orders',
   orderItem: 'order_items',
@@ -44,6 +45,12 @@ const productSchema = createBaseSchema<Product>({
     sellPrice: { type: Number, required: true, min: 0 },
     status: { type: String, required: true, enum: productStatusValues, default: 'active' }
 });
+
+const unitSchema = createBaseSchema<Unit>({
+    unitName: { type: String, required: true, trim: true },
+    status: { type: String, required: true, enum: productStatusValues, default: 'active' }
+});
+unitSchema.index({ unitName: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
 
 const customerSchema = createBaseSchema<Customer>({
     customerName: { type: String, required: true, trim: true },
@@ -87,6 +94,7 @@ const counterSchema = createBaseSchema({
 });
 
 export const ProductModel = models.Product || model<Product>('Product', productSchema, collectionNames.product);
+export const UnitModel = models.Unit || model<Unit>('Unit', unitSchema, collectionNames.unit);
 export const CustomerModel = models.Customer || model<Customer>('Customer', customerSchema, collectionNames.customer);
 export const OrderModel = models.Order || model<Order>('Order', orderSchema, collectionNames.order);
 export const OrderItemModel =

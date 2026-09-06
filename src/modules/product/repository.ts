@@ -1,6 +1,6 @@
 import { ClientSession } from 'mongoose';
-import { ProductModel } from '../../shared/persistence';
-import { EntityPatch, NewEntity, Product } from '../../shared/types';
+import { ProductModel, UnitModel } from '../../shared/persistence';
+import { EntityPatch, NewEntity, Product, Unit } from '../../shared/types';
 
 const toProductCreateDoc = (input: NewEntity<Product, never>) => ({
   productName: input.productName,
@@ -99,5 +99,14 @@ export const productRepository = {
       { runValidators: true }
     ).session(session ?? null);
     return result.matchedCount > 0;
+  }
+};
+
+export const unitRepository = {
+  list() {
+    return UnitModel.find({ status: 'active' })
+      .collation({ locale: 'th' })
+      .sort({ unitName: 1 })
+      .lean<Unit[]>();
   }
 };

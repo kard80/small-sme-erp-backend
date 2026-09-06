@@ -20,6 +20,11 @@ export interface Product extends MongoEntity {
   status: ProductStatus;
 }
 
+export interface Unit extends MongoEntity {
+  unitName: string;
+  status: ProductStatus;
+}
+
 export interface Customer extends MongoEntity {
   customerName: string;
   address: string;
