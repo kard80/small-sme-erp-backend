@@ -321,15 +321,11 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
       }
 
       .words-value {
-        position: relative;
         border-left: none;
+        text-align: right;
       }
 
       .words-value-text {
-        position: absolute;
-        right: 12px;
-        top: 50%;
-        transform: translateY(-50%);
         white-space: nowrap;
       }
 
