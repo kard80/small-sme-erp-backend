@@ -7,6 +7,7 @@ const toProductCreateDoc = (input: NewEntity<Product, never>) => ({
   unit: input.unit,
   defaultBuyPrice: input.defaultBuyPrice,
   sellPrice: input.sellPrice,
+  remark: input.remark,
   status: input.status
 });
 
@@ -24,6 +25,9 @@ const toProductUpdateDoc = (input: EntityPatch<Product, never>) => {
   }
   if (input.sellPrice !== undefined) {
     update.sellPrice = input.sellPrice;
+  }
+  if (input.remark !== undefined) {
+    update.remark = input.remark;
   }
   if (input.status !== undefined) {
     update.status = input.status;

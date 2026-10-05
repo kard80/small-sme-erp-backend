@@ -17,6 +17,7 @@ export interface Product extends MongoEntity {
   unit: string;
   defaultBuyPrice?: number;
   sellPrice: number;
+  remark?: string;
   status: ProductStatus;
 }
 
@@ -46,6 +47,7 @@ export interface Order extends MongoEntity {
   deliveryDate: Date;
   deliveryNote?: string;
   materialCategory?: string;
+  remark?: string;
   completedAt?: Date | null;
   cancelledAt?: Date | null;
 }
@@ -68,6 +70,7 @@ export interface CreateOrderInput {
   customerId: string;
   customerDepartment?: string;
   materialCategory?: string;
+  remark?: string;
   dueDate: Date;
   deliveryDate: Date;
   status: CreateOrderStatus;

@@ -45,6 +45,7 @@ const productSchema = createBaseSchema<Product>({
     unit: { type: String, required: true, trim: true },
     defaultBuyPrice: { type: Number, required: false, min: 0 },
     sellPrice: { type: Number, required: true, min: 0 },
+    remark: { type: String, required: false, trim: true },
     status: { type: String, required: true, enum: productStatusValues, default: 'active' }
 });
 
@@ -72,6 +73,7 @@ const orderSchema = createBaseSchema<Order>({
     deliveryDate: { type: Date, required: true },
     deliveryNote: { type: String, required: false, trim: true },
     materialCategory: { type: String, required: false, trim: true },
+    remark: { type: String, required: false, trim: true },
     completedAt: { type: Date, required: false, default: null },
     cancelledAt: { type: Date, required: false, default: null }
 });

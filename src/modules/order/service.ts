@@ -68,6 +68,7 @@ const resolveOrderItems = (
       customerBillAddress: customerSnapshot.customerBillAddress,
       customerDepartment: input.customerDepartment,
       materialCategory: input.materialCategory,
+      remark: input.remark,
       totalAmount,
       totalExpense,
       dueDate: input.dueDate,
@@ -171,6 +172,7 @@ const applyOrderFieldUpdates = async (
   const nextDeliveryDate = input.deliveryDate ?? existingOrder.deliveryDate;
   const nextCustomerDepartment = input.customerDepartment ?? existingOrder.customerDepartment;
   const nextMaterialCategory = input.materialCategory ?? existingOrder.materialCategory;
+  const nextRemark = input.remark ?? existingOrder.remark;
 
   let orderItems = input.items
     ? await (async () => {
@@ -202,6 +204,7 @@ const applyOrderFieldUpdates = async (
       customerBillAddress: customerSnapshot.customerBillAddress,
       customerDepartment: nextCustomerDepartment,
       materialCategory: nextMaterialCategory,
+      remark: nextRemark,
       totalAmount,
       totalExpense,
       dueDate: nextDueDate,

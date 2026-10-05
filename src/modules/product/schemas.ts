@@ -4,7 +4,8 @@ const productBaseSchema = z.object({
   productName: z.string().min(1),
   unit: z.string().min(1),
   defaultBuyPrice: z.coerce.number().nonnegative().optional(),
-  sellPrice: z.coerce.number().nonnegative()
+  sellPrice: z.coerce.number().nonnegative(),
+  remark: z.string().trim().optional()
 });
 
 export const createProductSchema = productBaseSchema;
