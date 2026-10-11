@@ -2,7 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getAnthropicApiKey } from '../../shared/env';
 import { ImageType, ClaudeLines, claudeLinesSchema } from './schemas';
 
-const model = 'claude-sonnet-5-5';
+// Trial: Haiku 5.5 is ~10x cheaper than Sonnet 5.5. Its default effort is medium, so set it explicitly.
+// Fall back to 'claude-sonnet-5-5' if real photos show wrong quantities or product matches.
+const model = 'claude-haiku-5-5';
 const toolName = 'record_order_lines';
 
 const instructions = `You read a photographed customer order list (handwritten or printed) and match each line to the product catalog below.
@@ -67,6 +69,7 @@ export const readOrderLines = async (
   const response = await getClient().messages.create({
     model,
     max_tokens: 8000,
+    output_config: { effort: 'high' },
     system: [{ type: 'text', text: instructions + catalogText, cache_control: { type: 'ephemeral' } }],
     tools: [tool],
     messages: [
