@@ -10,8 +10,12 @@ const productBaseSchema = z.object({
 
 export const createProductSchema = productBaseSchema;
 
+const productStatusSchema = z.enum(['active', 'inactive']);
+
 export const importProductSchema = productBaseSchema.extend({
-  status: z.enum(['active', 'inactive']).default('active')
+  status: productStatusSchema.default('active')
 });
 
-export const productUpdateSchema = importProductSchema.partial();
+// Built from the un-defaulted status: .partial() on importProductSchema would still apply the
+// 'active' default and reactivate a soft-deleted product on any partial update.
+export const productUpdateSchema = productBaseSchema.extend({ status: productStatusSchema }).partial();
