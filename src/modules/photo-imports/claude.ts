@@ -68,7 +68,7 @@ export const readOrderLines = async (
   // claude-sonnet-5-5 rejects forced tool_choice, so tool_choice stays auto and the prompt demands the call.
   const response = await getClient().messages.create({
     model,
-    max_tokens: 8000,
+    max_tokens: 32000, // thinking at effort 'high' shares this budget; 8000 ran out before the tool call
     output_config: { effort: 'high' },
     system: [{ type: 'text', text: instructions + catalogText, cache_control: { type: 'ephemeral' } }],
     tools: [tool],
