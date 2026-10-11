@@ -5,11 +5,11 @@ const { nextSequenceMock } = vi.hoisted(() => ({
   nextSequenceMock: vi.fn()
 }));
 
-vi.mock('../src/shared/persistence', () => ({
+vi.mock('../../shared/persistence', () => ({
   nextSequence: nextSequenceMock
 }));
 
-import { generateDeliveryNoteNumber } from '../src/modules/order/delivery-note';
+import { generateDeliveryNoteNumber } from './delivery-note';
 
 describe('generateDeliveryNoteNumber', () => {
   afterEach(() => {

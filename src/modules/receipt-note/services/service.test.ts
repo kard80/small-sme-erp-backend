@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import moment from 'moment';
 
-vi.mock('../src/modules/receipt-note/repository/receipt-note.repository', () => ({
+vi.mock('../repository/receipt-note.repository', () => ({
   receiptNoteRepository: {
     findById: vi.fn(),
     list: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('../src/modules/receipt-note/repository/receipt-note.repository', () => 
   }
 }));
 
-vi.mock('../src/modules/receipt-note/repository/receipt-note-billing-note.repository', () => ({
+vi.mock('../repository/receipt-note-billing-note.repository', () => ({
   receiptNoteBillingNoteRepository: {
     find: vi.fn(),
     listReceiptedBillingNoteIds: vi.fn(),
@@ -22,37 +22,37 @@ vi.mock('../src/modules/receipt-note/repository/receipt-note-billing-note.reposi
   }
 }));
 
-vi.mock('../src/modules/billing-note/repository/billing-note.repository', () => ({
+vi.mock('../../billing-note/repository/billing-note.repository', () => ({
   billingNoteRepository: {
     list: vi.fn(),
     findByIds: vi.fn()
   }
 }));
 
-vi.mock('../src/modules/customers/repository', () => ({
+vi.mock('../../customers/repository', () => ({
   customersRepository: {
     findById: vi.fn(),
     findByIds: vi.fn()
   }
 }));
 
-vi.mock('../src/shared/pdf', () => ({
+vi.mock('../../../shared/pdf', () => ({
   renderHtmlToPdf: vi.fn()
 }));
 
-vi.mock('../src/modules/receipt-note/receipt-note-document-template', () => ({
+vi.mock('../receipt-note-document-template', () => ({
   buildReceiptNoteDocumentHtml: vi.fn(() => '<html></html>')
 }));
 
-vi.mock('../src/shared/gcs', () => ({
+vi.mock('../../../shared/gcs', () => ({
   correctionDepartmentBucketName: 'correction-department-private',
   createSignedObjectDownloadUrl: vi.fn(),
   deleteObjectFromBucket: vi.fn(),
   uploadObjectToBucket: vi.fn()
 }));
 
-vi.mock('../src/shared/persistence', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/shared/persistence')>();
+vi.mock('../../../shared/persistence', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../shared/persistence')>();
   return {
     ...actual,
     nextSequence: vi.fn(),
@@ -60,15 +60,15 @@ vi.mock('../src/shared/persistence', async (importOriginal) => {
   };
 });
 
-import { receiptNoteService } from '../src/modules/receipt-note/services/service';
-import { receiptNoteRepository } from '../src/modules/receipt-note/repository/receipt-note.repository';
-import { receiptNoteBillingNoteRepository } from '../src/modules/receipt-note/repository/receipt-note-billing-note.repository';
-import { billingNoteRepository } from '../src/modules/billing-note/repository/billing-note.repository';
-import { customersRepository } from '../src/modules/customers/repository';
-import { nextSequence, runInTransaction } from '../src/shared/persistence';
-import { correctionDepartmentBucketName, deleteObjectFromBucket, uploadObjectToBucket } from '../src/shared/gcs';
-import { renderHtmlToPdf } from '../src/shared/pdf';
-import { ConflictError, NotFoundError } from '../src/shared/errors';
+import { receiptNoteService } from './service';
+import { receiptNoteRepository } from '../repository/receipt-note.repository';
+import { receiptNoteBillingNoteRepository } from '../repository/receipt-note-billing-note.repository';
+import { billingNoteRepository } from '../../billing-note/repository/billing-note.repository';
+import { customersRepository } from '../../customers/repository';
+import { nextSequence, runInTransaction } from '../../../shared/persistence';
+import { correctionDepartmentBucketName, deleteObjectFromBucket, uploadObjectToBucket } from '../../../shared/gcs';
+import { renderHtmlToPdf } from '../../../shared/pdf';
+import { ConflictError, NotFoundError } from '../../../shared/errors';
 
 const customerId = new Types.ObjectId().toString();
 

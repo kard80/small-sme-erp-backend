@@ -42,7 +42,7 @@ import {
   getGcsRuntimeConfig,
   isGcsConfigured,
   uploadObjectToBucket
-} from '../src/shared/gcs';
+} from './gcs';
 
 const originalEnv = {
   GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME,

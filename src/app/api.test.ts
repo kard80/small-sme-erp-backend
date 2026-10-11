@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { extractProductImportRows } from '../src/modules/product/routes';
+import { extractProductImportRows } from '../modules/product/routes';
 import {
   initiateDb,
   disconnectPersistence,
@@ -9,9 +9,9 @@ import {
   OrderItemModel,
   OrderModel,
   ProductModel
-} from '../src/shared/persistence';
-import { createRestApp } from '../src/restApp';
-import { productService } from '../src/modules/product/service';
+} from '../shared/persistence';
+import { createRestApp } from '../restApp';
+import { productService } from '../modules/product/service';
 
 const describeIfMongo = process.env.MONGODB_URI ? describe : describe.skip;
 const testProductId = new Types.ObjectId().toString();

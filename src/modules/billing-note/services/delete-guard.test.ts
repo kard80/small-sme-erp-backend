@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../src/modules/billing-note/repository/billing-note.repository', () => ({
+vi.mock('../repository/billing-note.repository', () => ({
   billingNoteRepository: {
     findById: vi.fn(),
     list: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('../src/modules/billing-note/repository/billing-note.repository', () => 
   }
 }));
 
-vi.mock('../src/modules/billing-note/repository/billing-note-order.repository', () => ({
+vi.mock('../repository/billing-note-order.repository', () => ({
   billingNoteOrderRepository: {
     find: vi.fn(),
     listBilledOrderIds: vi.fn(),
@@ -22,21 +22,21 @@ vi.mock('../src/modules/billing-note/repository/billing-note-order.repository', 
   }
 }));
 
-vi.mock('../src/modules/receipt-note/repository/receipt-note-billing-note.repository', () => ({
+vi.mock('../../receipt-note/repository/receipt-note-billing-note.repository', () => ({
   receiptNoteBillingNoteRepository: {
     isBillingNoteReceipted: vi.fn()
   }
 }));
 
-vi.mock('../src/shared/gcs', () => ({
+vi.mock('../../../shared/gcs', () => ({
   correctionDepartmentBucketName: 'correction-department-private',
   createSignedObjectDownloadUrl: vi.fn(),
   deleteObjectFromBucket: vi.fn(),
   uploadObjectToBucket: vi.fn()
 }));
 
-vi.mock('../src/shared/persistence', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/shared/persistence')>();
+vi.mock('../../../shared/persistence', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../shared/persistence')>();
   return {
     ...actual,
     nextSequence: vi.fn(),
@@ -44,12 +44,12 @@ vi.mock('../src/shared/persistence', async (importOriginal) => {
   };
 });
 
-import { billingNoteService } from '../src/modules/billing-note/services/service';
-import { billingNoteRepository } from '../src/modules/billing-note/repository/billing-note.repository';
-import { billingNoteOrderRepository } from '../src/modules/billing-note/repository/billing-note-order.repository';
-import { receiptNoteBillingNoteRepository } from '../src/modules/receipt-note/repository/receipt-note-billing-note.repository';
-import { deleteObjectFromBucket } from '../src/shared/gcs';
-import { ConflictError, NotFoundError } from '../src/shared/errors';
+import { billingNoteService } from './service';
+import { billingNoteRepository } from '../repository/billing-note.repository';
+import { billingNoteOrderRepository } from '../repository/billing-note-order.repository';
+import { receiptNoteBillingNoteRepository } from '../../receipt-note/repository/receipt-note-billing-note.repository';
+import { deleteObjectFromBucket } from '../../../shared/gcs';
+import { ConflictError, NotFoundError } from '../../../shared/errors';
 
 const billingNoteId = new Types.ObjectId().toString();
 

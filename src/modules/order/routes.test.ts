@@ -1,0 +1,111 @@
+import express from 'express';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('./service', () => ({
+  orderService: {
+    createOrder: vi.fn(),
+    listOrders: vi.fn(),
+    getSummary: vi.fn(),
+    getDeliveryNoteDownloadUrl: vi.fn(),
+    createDeliveryNote: vi.fn(),
+    getOrderWithItems: vi.fn(),
+    updateOrder: vi.fn(),
+    removeOrder: vi.fn()
+  }
+}));
+
+import { createOrderRouter } from './routes';
+import { requireAuth } from '../auth/middleware';
+import { fallbackErrorHandler } from '../../shared/http';
+import { login } from '../auth/service';
+import { NotFoundError } from '../../shared/errors';
+import { orderService } from './service';
+
+const app = express();
+app.use(express.json());
+app.use('/api/v1/orders', requireAuth, createOrderRouter());
+app.use(fallbackErrorHandler);
+
+const auth = () => ({ Authorization: `Bearer ${login('admin', '1234').accessToken}` });
+const oid = 'b'.repeat(24);
+
+beforeEach(() => vi.resetAllMocks());
+
+describe('orders auth gate', () => {
+  it('requires a token', async () => {
+    expect((await request(app).get('/api/v1/orders')).status).toBe(401);
+  });
+});
+
+describe('order routes', () => {
+  const body = {
+    customerId: oid,
+    dueDate: '2026-02-01',
+    deliveryDate: '2026-01-31',
+    status: 'draft',
+    items: [{ productId: oid, productName: 'a', unit: 'kg', quantity: 1, buyPrice: 0, sellPrice: 1 }]
+  };
+
+  it('POST validates (field-keyed errors) and returns 201', async () => {
+    const bad = await request(app).post('/api/v1/orders').set(auth()).send({ ...body, items: [] });
+    expect(bad.status).toBe(400);
+    expect(bad.body.errors.items).toBeDefined();
+
+    vi.mocked(orderService.createOrder).mockResolvedValue({} as any);
+    expect((await request(app).post('/api/v1/orders').set(auth()).send(body)).status).toBe(201);
+  });
+
+  it('GET builds a delivery date range and completed filter', async () => {
+    vi.mocked(orderService.listOrders).mockResolvedValue({ data: [] } as any);
+    await request(app)
+      .get('/api/v1/orders?deliveryDateStart=2026-01-01&deliveryDateEnd=2026-01-31&status=completed')
+      .set(auth());
+
+    const arg = vi.mocked(orderService.listOrders).mock.calls[0][0] as any;
+    expect(arg.where.deliveryDate.$gte).toBeInstanceOf(Date);
+    expect(arg.where.deliveryDate.$lte.getTime()).toBeGreaterThan(arg.where.deliveryDate.$gte.getTime());
+    expect(arg.where.completedAt.$ne).toBeNull();
+  });
+
+  it('GET ignores a half-specified date range', async () => {
+    vi.mocked(orderService.listOrders).mockResolvedValue({ data: [] } as any);
+    await request(app).get('/api/v1/orders?deliveryDateStart=2026-01-01').set(auth());
+    expect((vi.mocked(orderService.listOrders).mock.calls[0][0] as any).where).toEqual({});
+  });
+
+  it('GET /summary is not swallowed by /:orderId', async () => {
+    vi.mocked(orderService.getSummary).mockResolvedValue({ revenue: 1 } as any);
+    const res = await request(app).get('/api/v1/orders/summary?startDate=2026-01-01').set(auth());
+    expect(res.status).toBe(200);
+    expect(orderService.getSummary).toHaveBeenCalledWith('2026-01-01', undefined);
+  });
+
+  it('id-based routes validate ObjectIds and 404 when missing', async () => {
+    expect((await request(app).get('/api/v1/orders/bad').set(auth())).status).toBe(400);
+    expect((await request(app).get('/api/v1/orders/bad/delivery-note').set(auth())).status).toBe(400);
+    expect((await request(app).post('/api/v1/orders/bad/delivery-note').set(auth())).status).toBe(400);
+    expect((await request(app).patch('/api/v1/orders/bad').set(auth()).send({})).status).toBe(400);
+    expect((await request(app).delete('/api/v1/orders/bad').set(auth())).status).toBe(400);
+
+    vi.mocked(orderService.getOrderWithItems).mockResolvedValue(undefined);
+    vi.mocked(orderService.createDeliveryNote).mockResolvedValue(undefined);
+    vi.mocked(orderService.updateOrder).mockResolvedValue(undefined);
+    vi.mocked(orderService.removeOrder).mockResolvedValue(undefined);
+    expect((await request(app).get(`/api/v1/orders/${oid}`).set(auth())).status).toBe(404);
+    expect((await request(app).post(`/api/v1/orders/${oid}/delivery-note`).set(auth())).status).toBe(404);
+    expect((await request(app).patch(`/api/v1/orders/${oid}`).set(auth()).send({})).status).toBe(404);
+    expect((await request(app).delete(`/api/v1/orders/${oid}`).set(auth())).status).toBe(404);
+  });
+
+  it('delete returns 204 and service errors surface their status', async () => {
+    vi.mocked(orderService.removeOrder).mockResolvedValue({} as any);
+    expect((await request(app).delete(`/api/v1/orders/${oid}`).set(auth())).status).toBe(204);
+
+    vi.mocked(orderService.getDeliveryNoteDownloadUrl).mockRejectedValue(new NotFoundError('nf'));
+    const res = await request(app).get(`/api/v1/orders/${oid}/delivery-note`).set(auth());
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'nf' });
+  });
+});
+

@@ -1,9 +1,9 @@
 import { Types } from 'mongoose';
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { generateDeliveryNotePdfBuffer } from '../src/modules/order/delivery-note';
-import { buildDeliveryNoteHtml, formatThaiDate } from '../src/modules/order/delivery-note-template';
-import { Order, OrderItem } from '../src/shared/types';
+import { generateDeliveryNotePdfBuffer } from './delivery-note';
+import { buildDeliveryNoteHtml, formatThaiDate } from './delivery-note-template';
+import { Order, OrderItem } from '../../shared/types';
 
 const buildOrder = (overrides: Partial<Order> = {}): Order => {
   const orderId = new Types.ObjectId();
