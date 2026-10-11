@@ -38,7 +38,7 @@ export const orderRepository = {
       }
     }
 
-    const cursor = OrderModel.find(query).sort(sort ?? { _id: -1 });
+    const cursor = OrderModel.find(query).sort(sort ?? { deliveryDate: -1, _id: -1 });
     if (skip !== undefined && pageSize) {
       cursor.skip(skip).limit(pageSize);
     }

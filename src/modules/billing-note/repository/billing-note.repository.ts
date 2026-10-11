@@ -25,7 +25,7 @@ class BillingNoteRepository {
     };
 
     const { page, pageSize, skip } = pagination;
-    const cursor = BillingNoteModel.find(query).sort({ issuedDate: 1 });
+    const cursor = BillingNoteModel.find(query).sort({ issuedDate: -1, _id: -1 });
     if (skip !== undefined && pageSize) {
       cursor.skip(skip).limit(pageSize);
     }

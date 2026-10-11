@@ -21,7 +21,7 @@ class ReceiptNoteRepository {
     };
 
     const { page, pageSize, skip } = pagination;
-    const cursor = ReceiptNoteModel.find(query).sort({ receiptDate: 1 });
+    const cursor = ReceiptNoteModel.find(query).sort({ receiptDate: -1, _id: -1 });
     if (skip !== undefined && pageSize) {
       cursor.skip(skip).limit(pageSize);
     }
