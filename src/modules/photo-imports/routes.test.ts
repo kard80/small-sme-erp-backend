@@ -3,7 +3,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./service', () => ({
-  photoImportsService: { upload: vi.fn(), list: vi.fn(), get: vi.fn(), retry: vi.fn(), consume: vi.fn() }
+  photoImportsService: { upload: vi.fn(), list: vi.fn(), get: vi.fn(), retry: vi.fn(), consume: vi.fn(), remove: vi.fn() }
 }));
 
 import { createPhotoImportsRouter } from './routes';
@@ -74,5 +74,13 @@ describe('photo-imports routes', () => {
     expect((await request(app).post(`/api/v1/photo-imports/${oid}/retry`).set(auth())).status).toBe(200);
     vi.mocked(photoImportsService.consume).mockResolvedValue({ id: oid, status: 'consumed' });
     expect((await request(app).post(`/api/v1/photo-imports/${oid}/consume`).set(auth())).status).toBe(200);
+  });
+
+  it('DELETE :id validates the id and returns 204', async () => {
+    expect((await request(app).delete('/api/v1/photo-imports/bad').set(auth())).status).toBe(400);
+    vi.mocked(photoImportsService.remove).mockResolvedValue(undefined);
+    const res = await request(app).delete(`/api/v1/photo-imports/${oid}`).set(auth());
+    expect(res.status).toBe(204);
+    expect(vi.mocked(photoImportsService.remove).mock.calls[0]).toEqual(['admin', oid]);
   });
 });

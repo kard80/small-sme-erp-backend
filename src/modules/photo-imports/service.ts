@@ -4,12 +4,13 @@ import { BadRequestError, ConflictError, HttpError, NotFoundError } from '../../
 import {
   correctionDepartmentBucketName,
   createSignedObjectDownloadUrl,
+  deleteObjectFromBucket,
   downloadObjectFromBucket,
   uploadObjectToBucket
 } from '../../shared/gcs';
 import { logger } from '../../shared/logger';
 import { PhotoImportLine } from '../../shared/types';
-import { productRepository } from '../product/repository';
+import { productRepository, unitRepository } from '../product/repository';
 import { readOrderLines } from './claude';
 import { photoImportRepository } from './repository';
 import { ClaudeLines, detectImageType, imageExtension } from './schemas';
@@ -25,10 +26,11 @@ const imageUrlExpiresSeconds = 15 * 60;
 
 type CatalogEntry = { productName: string; unit: string };
 
-const normUnit = (unit: string) => unit.trim().toLowerCase();
+// Ignore dots and spaces so 'กก.' and 'กก' compare equal.
+const normUnit = (unit: string) => unit.replace(/[.\s]/g, '').toLowerCase();
 
 const buildCatalog = async () => {
-  const products = await productRepository.listActiveCatalog();
+  const [products, units] = await Promise.all([productRepository.listActiveCatalog(), unitRepository.list()]);
   const byId = new Map<string, CatalogEntry>(
     products.map((p) => [String(p._id), { productName: p.productName, unit: p.unit }])
   );
@@ -36,7 +38,12 @@ const buildCatalog = async () => {
   if (products.length > maxCatalogProducts) {
     throw new ImportError('catalog too large');
   }
-  const text = products.map((p) => `${p._id} | ${p.productName} | ${p.unit}`).join('\n');
+  const text = [
+    `System units: ${units.map((u) => u.unitName).join(', ')}`,
+    '',
+    'Catalog, one product per line as: id | name | unit',
+    ...products.map((p) => `${p._id} | ${p.productName} | ${p.unit}`)
+  ].join('\n');
   return { byId, text };
 };
 
@@ -172,6 +179,17 @@ export const photoImportsService = {
   async consume(userId: string, id: string) {
     await transitionOrThrow(userId, id, 'ready', 'consumed');
     return { id, status: 'consumed' as const };
+  },
+
+  async remove(userId: string, id: string) {
+    const removed = await photoImportRepository.softDelete(id, userId);
+    if (!removed) {
+      throw new NotFoundError('ไม่พบรายการนำเข้า');
+    }
+    // Best effort: the bucket lifecycle rule removes the photo anyway.
+    await deleteObjectFromBucket(correctionDepartmentBucketName, removed.imageKey).catch((err) =>
+      logger.warn({ err, photoImportId: id }, 'could not delete photo import image')
+    );
   },
 
   // Boot sweep: anything stuck in 'processing' lost its worker when the process died.

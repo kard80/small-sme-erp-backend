@@ -10,11 +10,11 @@ const instructions = `You read a photographed customer order list (handwritten o
 Rules:
 - Match ONLY to product ids that appear in the catalog. Never invent an id. Use productId null when there is no real match.
 - rawText is the line copied verbatim from the image.
-- qty and unit are exactly as written. Never convert units.
+- qty is exactly as written.
+- unit: when the written unit is an abbreviation or spelling variant of one of the system units listed below (for example กก. or กก = กิโลกรัม, กส. = กระสอบ), output that system unit's exact name. That is the same unit, not a conversion. Otherwise output the unit as written. Never convert between different units (for example โหล to ชิ้น).
 - Give your best guess plus up to 2 alternative catalog products, and a confidence of high, medium or low.
 - Call the ${toolName} tool exactly once with every line you can read, in order.
 
-Catalog, one product per line as: id | name | unit
 `;
 
 const tool: Anthropic.Tool = {

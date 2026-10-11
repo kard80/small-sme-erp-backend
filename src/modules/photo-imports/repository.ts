@@ -33,7 +33,8 @@ export const photoImportRepository = {
   },
 
   listByUser(userId: string, status?: PhotoImportStatus) {
-    return PhotoImportModel.find({ userId, ...(status ? { status } : {}), ...notDeleted })
+    // Without a filter, consumed imports are hidden: they already became orders.
+    return PhotoImportModel.find({ userId, status: status ?? { $ne: 'consumed' }, ...notDeleted })
       .sort({ createdAt: -1 })
       .select('status createdAt lines.rawText')
       .lean<Pick<PhotoImport, '_id' | 'status' | 'createdAt' | 'lines'>[]>();
@@ -64,6 +65,13 @@ export const photoImportRepository = {
       },
       { $set: set },
       { new: true }
+    ).lean<PhotoImport | null>();
+  },
+
+  softDelete(id: string, userId: string) {
+    return PhotoImportModel.findOneAndUpdate(
+      { _id: id, userId, ...notDeleted },
+      { $set: { deletedAt: new Date() } }
     ).lean<PhotoImport | null>();
   },
 

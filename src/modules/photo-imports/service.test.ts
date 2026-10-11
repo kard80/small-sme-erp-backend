@@ -7,6 +7,7 @@ vi.mock('./repository', () => ({
     findById: vi.fn(),
     findOwned: vi.fn(),
     listByUser: vi.fn(),
+    softDelete: vi.fn(),
     countSince: vi.fn(),
     transition: vi.fn(),
     markReady: vi.fn(),
@@ -15,16 +16,19 @@ vi.mock('./repository', () => ({
   }
 }));
 vi.mock('./claude', () => ({ readOrderLines: vi.fn() }));
-vi.mock('../product/repository', () => ({ productRepository: { listActiveCatalog: vi.fn() } }));
+vi.mock('../product/repository', () => ({ productRepository: { listActiveCatalog: vi.fn() },
+  unitRepository: { list: vi.fn() }
+}));
 vi.mock('../../shared/gcs', () => ({
   correctionDepartmentBucketName: 'bucket',
   uploadObjectToBucket: vi.fn(),
   downloadObjectFromBucket: vi.fn(),
+  deleteObjectFromBucket: vi.fn(),
   createSignedObjectDownloadUrl: vi.fn()
 }));
 
-import { downloadObjectFromBucket, uploadObjectToBucket, createSignedObjectDownloadUrl } from '../../shared/gcs';
-import { productRepository } from '../product/repository';
+import { deleteObjectFromBucket, downloadObjectFromBucket, uploadObjectToBucket, createSignedObjectDownloadUrl } from '../../shared/gcs';
+import { productRepository, unitRepository } from '../product/repository';
 import { readOrderLines } from './claude';
 import { photoImportRepository as repo } from './repository';
 import { photoImportsService, processImport } from './service';
@@ -56,6 +60,7 @@ const runProcess = async (lines: object[]) => {
   vi.mocked(repo.findById).mockResolvedValue({ _id: docId, status: 'processing', imageKey: 'k.jpg' } as any);
   vi.mocked(downloadObjectFromBucket).mockResolvedValue(jpeg);
   vi.mocked(productRepository.listActiveCatalog).mockResolvedValue(catalog as any);
+  vi.mocked(unitRepository.list).mockResolvedValue([{ unitName: 'bag' }, { unitName: 'กิโลกรัม' }] as any);
   vi.mocked(readOrderLines).mockResolvedValue({ lines } as any);
   await processImport(docId);
 };
@@ -90,18 +95,21 @@ describe('processImport', () => {
         unit: 'kg',
         alternatives: [altId, alt2Id, alt3Id, pId].map((i) => ({ productId: String(i) }))
       }),
-      rawLine({ unit: ' BAG ' })
+      rawLine({ unit: ' BAG ' }),
+      rawLine({ unit: 'B.A G.' })
     ]);
-    const [a, b] = vi.mocked(repo.markReady).mock.calls[0][1];
+    const [a, b, c] = vi.mocked(repo.markReady).mock.calls[0][1];
     expect(a.unitMismatch).toBe(true);
     expect(a.alternatives).toHaveLength(2);
     expect(b.unitMismatch).toBe(false);
+    expect(c.unitMismatch).toBe(false);
   });
 
   it('marks failed when Claude fails', async () => {
     vi.mocked(repo.findById).mockResolvedValue({ _id: docId, status: 'processing', imageKey: 'k.jpg' } as any);
     vi.mocked(downloadObjectFromBucket).mockResolvedValue(jpeg);
     vi.mocked(productRepository.listActiveCatalog).mockResolvedValue(catalog as any);
+    vi.mocked(unitRepository.list).mockResolvedValue([{ unitName: 'bag' }, { unitName: 'กิโลกรัม' }] as any);
     vi.mocked(readOrderLines).mockRejectedValue(new Error('boom'));
     vi.mocked(repo.markFailed).mockResolvedValue(undefined);
     await processImport(docId);
@@ -128,6 +136,7 @@ describe('processImport', () => {
     vi.mocked(repo.findById).mockResolvedValue({ _id: docId, status: 'processing', imageKey: 'k.jpg' } as any);
     vi.mocked(downloadObjectFromBucket).mockResolvedValue(jpeg);
     vi.mocked(productRepository.listActiveCatalog).mockResolvedValue(catalog as any);
+    vi.mocked(unitRepository.list).mockResolvedValue([{ unitName: 'bag' }, { unitName: 'กิโลกรัม' }] as any);
     vi.mocked(readOrderLines).mockRejectedValue(new Error('Claude returned no tool call (stop_reason: end_turn)'));
     vi.mocked(repo.markFailed).mockResolvedValue(undefined);
     await processImport(docId);
@@ -137,6 +146,7 @@ describe('processImport', () => {
   it('uses the supplied buffer instead of downloading', async () => {
     vi.mocked(repo.findById).mockResolvedValue({ _id: docId, status: 'processing', imageKey: 'k.jpg' } as any);
     vi.mocked(productRepository.listActiveCatalog).mockResolvedValue(catalog as any);
+    vi.mocked(unitRepository.list).mockResolvedValue([{ unitName: 'bag' }, { unitName: 'กิโลกรัม' }] as any);
     vi.mocked(readOrderLines).mockResolvedValue({ lines: [rawLine()] } as any);
     await processImport(docId, jpeg);
     expect(downloadObjectFromBucket).not.toHaveBeenCalled();
@@ -241,5 +251,24 @@ describe('state rules and ownership', () => {
     expect(await photoImportsService.list('u1', 'ready')).toEqual([
       { id: docId, status: 'ready', createdAt: new Date(0), lineCount: 2 }
     ]);
+  });
+});
+
+describe('remove', () => {
+  it('soft-deletes the owner import and deletes its image; 404 when not found', async () => {
+    vi.mocked(deleteObjectFromBucket).mockResolvedValue(undefined);
+    vi.mocked(repo.softDelete).mockResolvedValueOnce({ _id: docId, imageKey: 'photo-imports/a.jpg' } as any);
+    await photoImportsService.remove('u1', docId);
+    expect(repo.softDelete).toHaveBeenCalledWith(docId, 'u1');
+    expect(deleteObjectFromBucket).toHaveBeenCalledWith('bucket', 'photo-imports/a.jpg');
+
+    vi.mocked(repo.softDelete).mockResolvedValueOnce(null);
+    await expect(photoImportsService.remove('u2', docId)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('still succeeds when the image delete fails', async () => {
+    vi.mocked(repo.softDelete).mockResolvedValueOnce({ _id: docId, imageKey: 'k' } as any);
+    vi.mocked(deleteObjectFromBucket).mockRejectedValueOnce(new Error('gcs down'));
+    await expect(photoImportsService.remove('u1', docId)).resolves.toBeUndefined();
   });
 });

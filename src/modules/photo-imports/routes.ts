@@ -57,5 +57,14 @@ export const createPhotoImportsRouter = () => {
     return res.json(await photoImportsService.consume(userId(req), id));
   });
 
+  router.delete('/:id', async (req, res) => {
+    const id = parseObjectIdParam(req, res, 'รายการนำเข้า');
+    if (id === undefined) {
+      return;
+    }
+    await photoImportsService.remove(userId(req), id);
+    return res.status(204).send();
+  });
+
   return router;
 };
