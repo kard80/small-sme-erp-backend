@@ -249,3 +249,8 @@ export const createSignedObjectDownloadUrl = async (
     method: 'GET'
   };
 };
+
+export const downloadObjectFromBucket = async (bucketName: string, objectKey: string): Promise<Buffer> => {
+  const [body] = await createGcsClient().bucket(bucketName).file(objectKey).download();
+  return body;
+};

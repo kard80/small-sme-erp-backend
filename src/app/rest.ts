@@ -11,6 +11,7 @@ import { createCustomersRouter } from '../modules/customers/routes';
 import { createOrderRouter } from '../modules/order/routes';
 import { createBillingNoteRouter } from '../modules/billing-note/routes';
 import { createReceiptNoteRouter } from '../modules/receipt-note/routes';
+import { createPhotoImportsRouter } from '../modules/photo-imports/routes';
 
 export const createRestApp = () => {
   assertDbReady();
@@ -41,6 +42,7 @@ export const createRestApp = () => {
   apiV1.use('/billing-notes', requireAuth, createBillingNoteRouter());
   apiV1.use('/receipt-notes', requireAuth, createReceiptNoteRouter());
   apiV1.use('/orders', requireAuth, createOrderRouter());
+  apiV1.use('/photo-imports', requireAuth, createPhotoImportsRouter());
 
   app.use('/api/v1', apiV1);
   app.use(fallbackErrorHandler);

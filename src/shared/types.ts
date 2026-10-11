@@ -85,3 +85,25 @@ export interface CreateOrderItemInput {
   buyPrice: number;
   sellPrice: number;
 }
+
+export type PhotoImportStatus = 'processing' | 'ready' | 'failed' | 'consumed';
+export type PhotoImportConfidence = 'high' | 'medium' | 'low';
+
+export interface PhotoImportLine {
+  rawText: string;
+  qty: number;
+  unit: string;
+  productId: Types.ObjectId | null;
+  confidence: PhotoImportConfidence;
+  alternatives: { productId: Types.ObjectId; productName: string }[];
+  unitMismatch: boolean;
+}
+
+export interface PhotoImport extends MongoEntity {
+  userId: string;
+  imageKey: string;
+  status: PhotoImportStatus;
+  lines: PhotoImportLine[];
+  error?: string | null;
+  processingAt: Date;
+}

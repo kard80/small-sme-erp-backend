@@ -1,6 +1,6 @@
 import mongoose, { ClientSession, Schema, model, models } from 'mongoose';
 import { logger } from './logger';
-import { Customer, Order, OrderItem, Product, ProductStatus, Unit } from './types';
+import { Customer, Order, OrderItem, PhotoImport, Product, ProductStatus, Unit } from './types';
 
 mongoose.set('strictQuery', true);
 
@@ -25,7 +25,8 @@ export const collectionNames = {
   customer: 'customers',
   order: 'orders',
   orderItem: 'order_items',
-  counter: 'counters'
+  counter: 'counters',
+  photoImport: 'photo_imports'
 } as const;
 
 export const createBaseSchema = <T>(definition: Record<string, unknown>) =>
@@ -92,6 +93,35 @@ const orderItemSchema = createBaseSchema<OrderItem>({
     completedAt: { type: Date, required: false, default: null }
 });
 
+const photoImportLineSchema = new Schema(
+  {
+    rawText: { type: String, required: true },
+    qty: { type: Number, required: true },
+    unit: { type: String, required: true },
+    productId: { type: Schema.Types.ObjectId, required: false, default: null },
+    confidence: { type: String, required: true, enum: ['high', 'medium', 'low'] },
+    alternatives: [
+      {
+        _id: false,
+        productId: { type: Schema.Types.ObjectId, required: true },
+        productName: { type: String, required: true }
+      }
+    ],
+    unitMismatch: { type: Boolean, required: true, default: false }
+  },
+  { _id: false }
+);
+
+// userId is a string: auth users are not Mongo documents (JWT sub, e.g. 'admin').
+const photoImportSchema = createBaseSchema<PhotoImport>({
+    userId: { type: String, required: true, index: true },
+    imageKey: { type: String, required: true },
+    status: { type: String, required: true, enum: ['processing', 'ready', 'failed', 'consumed'], default: 'processing' },
+    lines: { type: [photoImportLineSchema], default: [] },
+    error: { type: String, required: false, default: null },
+    processingAt: { type: Date, required: true, default: Date.now }
+});
+
 const counterSchema = createBaseSchema({
     key: { type: String, required: true, unique: true },
     value: { type: Number, required: true, default: 0 }
@@ -103,6 +133,8 @@ export const CustomerModel = models.Customer || model<Customer>('Customer', cust
 export const OrderModel = models.Order || model<Order>('Order', orderSchema, collectionNames.order);
 export const OrderItemModel =
   models.OrderItem || model<OrderItem>('OrderItem', orderItemSchema, collectionNames.orderItem);
+export const PhotoImportModel =
+  models.PhotoImport || model<PhotoImport>('PhotoImport', photoImportSchema, collectionNames.photoImport);
 const CounterModel = models.Counter || model('Counter', counterSchema, collectionNames.counter);
 
 let initPromise: Promise<void> | undefined;

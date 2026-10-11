@@ -26,4 +26,4 @@ jobs:
     - name: Submit Cloud Build
       run: |
         gcloud builds submit --no-source --config=cloudbuild.yaml \
-          --substitutions=BRANCH_NAME=${GITHUB_REF_NAME},COMMIT_SHA=${GITHUB_SHA},_MONGODB_URI=${{ secrets.MONGODB_URI }},_NODE_ENV=${{ secrets.NODE_ENV }}
+          --substitutions=BRANCH_NAME=${GITHUB_REF_NAME},COMMIT_SHA=${GITHUB_SHA},_MONGODB_URI=${{ secrets.MONGODB_URI }},_NODE_ENV=${{ secrets.NODE_ENV }},_ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}

@@ -37,6 +37,13 @@ const toProductUpdateDoc = (input: EntityPatch<Product, never>) => {
 };
 
 export const productRepository = {
+  listActiveCatalog() {
+    return ProductModel.find({ status: 'active', deletedAt: null })
+      .sort({ productName: 1 })
+      .select('productName unit sellPrice')
+      .lean<Pick<Product, '_id' | 'productName' | 'unit' | 'sellPrice'>[]>();
+  },
+
   async create(input: NewEntity<Product, never>, session?: ClientSession) {
     const [product] = await ProductModel.create([toProductCreateDoc(input)], { session });
     return product.toObject();
