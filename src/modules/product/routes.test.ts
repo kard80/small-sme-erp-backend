@@ -15,11 +15,16 @@ vi.mock('./service', () => ({
   }
 }));
 
+vi.mock('../supplier/service', () => ({
+  supplierService: { listSuppliersOfProduct: vi.fn(), replaceSuppliersOfProduct: vi.fn() }
+}));
+
 import { createProductRouter } from './routes';
 import { requireAuth } from '../auth/middleware';
 import { fallbackErrorHandler } from '../../shared/http';
 import { login } from '../auth/service';
 import { productService } from './service';
+import { supplierService } from '../supplier/service';
 
 const app = express();
 app.use(express.json());
@@ -95,3 +100,20 @@ describe('product routes', () => {
   });
 });
 
+
+describe('product suppliers routes', () => {
+  it('GET /:id/suppliers validates id and returns list', async () => {
+    expect((await request(app).get('/api/v1/products/bad/suppliers').set(auth())).status).toBe(400);
+    vi.mocked(supplierService.listSuppliersOfProduct).mockResolvedValue([] as any);
+    expect((await request(app).get(`/api/v1/products/${oid}/suppliers`).set(auth())).status).toBe(200);
+  });
+
+  it('PUT /:id/suppliers validates body and succeeds', async () => {
+    expect((await request(app).put(`/api/v1/products/${oid}/suppliers`).set(auth()).send({})).status).toBe(400);
+    expect((await request(app).put('/api/v1/products/bad/suppliers').set(auth()).send([])).status).toBe(400);
+    vi.mocked(supplierService.replaceSuppliersOfProduct).mockResolvedValue([] as any);
+    const body = [{ supplierId: oid, priority: 1 }];
+    expect((await request(app).put(`/api/v1/products/${oid}/suppliers`).set(auth()).send(body)).status).toBe(200);
+    expect(supplierService.replaceSuppliersOfProduct).toHaveBeenCalledWith(oid, body);
+  });
+});

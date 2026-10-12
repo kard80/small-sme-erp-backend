@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import { paginationSchema, parseObjectIdParam } from '../../shared/http';
 import { createProductSchema, productUpdateSchema } from './schemas';
+import { supplierService } from '../supplier/service';
+import { productSuppliersSchema } from '../supplier/schemas';
 import { productService } from './service';
 import { productOrderHistoryDto } from './dto';
 
@@ -76,6 +78,28 @@ export const createProductRouter = () => {
 
   router.get('/units', async (req, res) => {
     return res.json(await productService.listUnits());
+  });
+
+  router.get('/:id/suppliers', async (req, res) => {
+    const id = parseObjectIdParam(req, res, 'สินค้า');
+    if (id === undefined) {
+      return;
+    }
+
+    return res.json(await supplierService.listSuppliersOfProduct(id));
+  });
+
+  router.put('/:id/suppliers', async (req, res) => {
+    const id = parseObjectIdParam(req, res, 'สินค้า');
+    const input = productSuppliersSchema.safeParse(req.body);
+    if (id === undefined) {
+      return;
+    }
+    if (!input.success) {
+      return res.status(400).json({ error: input.error.flatten() });
+    }
+
+    return res.json(await supplierService.replaceSuppliersOfProduct(id, input.data));
   });
 
   router.get('/:id', async (req, res) => {

@@ -21,6 +21,21 @@ export interface Product extends MongoEntity {
   status: ProductStatus;
 }
 
+export interface Supplier extends MongoEntity {
+  supplierName: string;
+  phone?: string;
+  remark?: string;
+}
+
+// Hard-deleted on replace (like order items), so no deletedAt use. `condition` is
+// intentionally a subdocument so pricing rules (minQty, buyPrice tiers) can be added later.
+export interface ProductSupplier extends MongoEntity {
+  productId: Types.ObjectId;
+  supplierId: Types.ObjectId;
+  priority: number;
+  condition?: { note?: string };
+}
+
 export interface Unit extends MongoEntity {
   unitName: string;
   status: ProductStatus;
