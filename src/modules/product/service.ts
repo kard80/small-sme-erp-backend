@@ -3,6 +3,7 @@ import { BadRequestError } from '../../shared/errors';
 import { importProductSchema } from './schemas';
 import { productRepository, unitRepository } from './repository';
 import { orderItemService } from '../order/services/order-item';
+import { productSuppliersRepository } from '../supplier/repository';
 import { Pagination } from '../../shared/pagination';
 import moment from 'moment';
 
@@ -31,6 +32,11 @@ interface GetProductHistoryParams {
   deliveryEndDate: string;
 }
 
+const withSupplierCount = async <T extends { _id: unknown }>(products: T[]) => {
+  const counts = await productSuppliersRepository.countByProductIds(products.map((p) => String(p._id)));
+  return products.map((p) => ({ ...p, supplierCount: counts.get(String(p._id)) ?? 0 }));
+};
+
 export const productService = {
   async createProduct(input: Parameters<typeof productRepository.create>[0]) {
     await ensureProductNameAndUnitAvailable(input.productName, input.unit);
@@ -52,16 +58,17 @@ export const productService = {
     });
   },
 
-  listProducts(page?: number, pageSize?: number, countZeroBuyPrice?: boolean) {
-    return productRepository.list(page, pageSize, countZeroBuyPrice);
+  async listProducts(page?: number, pageSize?: number, countZeroBuyPrice?: boolean) {
+    const result = await productRepository.list(page, pageSize, countZeroBuyPrice);
+    return { ...result, data: await withSupplierCount(result.data) };
   },
 
   listUnits() {
     return unitRepository.list();
   },
 
-  searchProducts(query: string) {
-    return productRepository.search(query);
+  async searchProducts(query: string) {
+    return withSupplierCount(await productRepository.search(query));
   },
 
   async updateProduct(id: string, input: Parameters<typeof productRepository.update>[1]) {

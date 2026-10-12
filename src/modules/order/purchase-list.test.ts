@@ -1,0 +1,38 @@
+import { Types } from 'mongoose';
+import { describe, expect, it } from 'vitest';
+import { buildPurchaseListHtml, groupItemsBySupplier } from './purchase-list';
+
+const id = () => new Types.ObjectId();
+const [p1, p2, p3, sA, sB, sDel] = [id(), id(), id(), id(), id(), id()];
+const item = (productId: Types.ObjectId, productName: string) =>
+  ({ productId, productName, quantity: 2, unit: 'kg' }) as never;
+const link = (productId: Types.ObjectId, supplierId: Types.ObjectId, priority: number) =>
+  ({ productId, supplierId, priority }) as never;
+const sup = (_id: Types.ObjectId, supplierName: string) => ({ _id, supplierName }) as never;
+
+describe('groupItemsBySupplier', () => {
+  it('uses lowest priority supplier, skips deleted ones, thai-sorts, puts unassigned last', () => {
+    const groups = groupItemsBySupplier(
+      [item(p1, 'a'), item(p2, 'b'), item(p3, 'c')],
+      [link(p1, sDel, 1), link(p1, sB, 2), link(p1, sA, 3), link(p2, sA, 1)],
+      [sup(sA, 'ข'), sup(sB, 'ก')]
+    );
+    expect(groups.map((g) => [g.supplierName, g.items.map((i) => i.productName)])).toEqual([
+      ['ก', ['a']],
+      ['ข', ['b']],
+      ['ไม่มีชื่อผู้ขาย', ['c']]
+    ]);
+  });
+});
+
+describe('buildPurchaseListHtml', () => {
+  it('has header, note column and no prices', () => {
+    const html = buildPurchaseListHtml(
+      { _id: id(), customerBillName: '<x>', deliveryDate: new Date('2026-01-31') } as never,
+      groupItemsBySupplier([item(p1, 'a')], [], [])
+    );
+    expect(html).toContain('&lt;x&gt;');
+    expect(html).toContain('หมายเหตุ');
+    expect(html).not.toMatch(/ราคา/);
+  });
+});

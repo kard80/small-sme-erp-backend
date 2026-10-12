@@ -1,4 +1,4 @@
-import { ClientSession } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { ConflictError } from '../../shared/errors';
 import { ProductModel, ProductSupplierModel, SupplierModel } from '../../shared/persistence';
 import { EntityPatch, NewEntity, Product, ProductSupplier, Supplier } from '../../shared/types';
@@ -95,6 +95,18 @@ export const productSuppliersRepository = {
   // stale links are never returned and never need cascading cleanup.
   findByProductId(productId: string) {
     return ProductSupplierModel.find({ productId }).sort({ priority: 1 }).lean<ProductSupplier[]>();
+  },
+
+  findByProductIds(productIds: string[]) {
+    return ProductSupplierModel.find({ productId: { $in: productIds } }).sort({ priority: 1 }).lean<ProductSupplier[]>();
+  },
+
+  async countByProductIds(productIds: string[]) {
+    const rows = await ProductSupplierModel.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { productId: { $in: productIds.map((id) => new Types.ObjectId(id)) } } },
+      { $group: { _id: '$productId', count: { $sum: 1 } } }
+    ]);
+    return new Map(rows.map((r) => [String(r._id), r.count]));
   },
 
   findBySupplierId(supplierId: string) {

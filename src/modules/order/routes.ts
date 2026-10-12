@@ -61,6 +61,18 @@ export const createOrderRouter = () => {
     return res.json(await orderService.getDeliveryNoteDownloadUrl(orderId));
   });
 
+  router.get('/:orderId/purchase-list', async (req, res) => {
+    const orderId = req.params.orderId;
+    if (typeof orderId !== 'string' || !Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: 'รหัสคำสั่งซื้อไม่ถูกต้อง' });
+    }
+
+    const pdf = await orderService.getPurchaseListPdf(orderId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="purchase-list-${orderId}.pdf"`);
+    return res.send(pdf);
+  });
+
   router.post('/:orderId/delivery-note', async (req, res) => {
     const orderId = req.params.orderId;
     if (typeof orderId !== 'string' || !Types.ObjectId.isValid(orderId)) {

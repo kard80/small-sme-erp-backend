@@ -10,6 +10,8 @@ import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './del
 import { orderRepository } from './repository/order.repository';
 import { ListOrdersProps, OrderWithEditable } from './types';
 import { Currency } from '../../shared/currency';
+import { productSuppliersRepository, suppliersRepository } from '../supplier/repository';
+import { generatePurchaseListPdf, groupItemsBySupplier } from './purchase-list';
 import { billingNoteOrderRepository } from '../billing-note/repository/billing-note-order.repository';
 
 const log = logger.child({ module: 'order' });
@@ -397,6 +399,19 @@ export const orderService = {
       objectKey: `DN/${deliveryNoteDocumentNumber}.pdf`,
       responseDisposition: `inline; filename="${deliveryNoteDocumentNumber}.pdf"`
     });
+  },
+
+  async getPurchaseListPdf(orderId: string) {
+    const orderWithItems = await this.getOrderWithItems(orderId);
+    if (!orderWithItems) {
+      throw new NotFoundError('ไม่พบคำสั่งซื้อ');
+    }
+    const { order, orderItems } = orderWithItems;
+
+    const links = await productSuppliersRepository.findByProductIds(orderItems.map((i) => String(i.productId)));
+    const suppliers = await suppliersRepository.findByIds([...new Set(links.map((l) => String(l.supplierId)))]);
+    const groups = groupItemsBySupplier(orderItems, links, suppliers);
+    return generatePurchaseListPdf(order, groups);
   },
 
   async createDeliveryNote(orderId: string) {

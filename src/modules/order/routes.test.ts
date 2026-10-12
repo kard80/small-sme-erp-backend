@@ -8,6 +8,7 @@ vi.mock('./service', () => ({
     listOrders: vi.fn(),
     getSummary: vi.fn(),
     getDeliveryNoteDownloadUrl: vi.fn(),
+    getPurchaseListPdf: vi.fn(),
     createDeliveryNote: vi.fn(),
     getOrderWithItems: vi.fn(),
     updateOrder: vi.fn(),
@@ -109,3 +110,22 @@ describe('order routes', () => {
   });
 });
 
+
+describe('GET /:orderId/purchase-list', () => {
+  it('streams a pdf attachment', async () => {
+    vi.mocked(orderService.getPurchaseListPdf).mockResolvedValue(Buffer.from('%PDF'));
+    const res = await request(app).get(`/api/v1/orders/${oid}/purchase-list`).set(auth());
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(res.headers['content-disposition']).toBe(`attachment; filename="purchase-list-${oid}.pdf"`);
+  });
+
+  it('400 on bad id, 404 when missing, 401 without token', async () => {
+    expect((await request(app).get('/api/v1/orders/zz/purchase-list').set(auth())).status).toBe(400);
+    vi.mocked(orderService.getPurchaseListPdf).mockRejectedValue(new NotFoundError('ไม่พบคำสั่งซื้อ'));
+    const res = await request(app).get(`/api/v1/orders/${oid}/purchase-list`).set(auth());
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'ไม่พบคำสั่งซื้อ' });
+    expect((await request(app).get(`/api/v1/orders/${oid}/purchase-list`)).status).toBe(401);
+  });
+});

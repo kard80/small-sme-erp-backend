@@ -10,12 +10,16 @@ vi.mock('./repository', () => ({
   },
   unitRepository: { list: vi.fn() }
 }));
+vi.mock('../supplier/repository', () => ({
+  productSuppliersRepository: { countByProductIds: vi.fn() }
+}));
 vi.mock('../order/services/order-item', () => ({
   orderItemService: { findProductHistory: vi.fn() }
 }));
 
 import { productService } from './service';
 import { productRepository } from './repository';
+import { productSuppliersRepository } from '../supplier/repository';
 import { orderItemService } from '../order/services/order-item';
 import { BadRequestError } from '../../shared/errors';
 
@@ -117,5 +121,16 @@ describe('productService.getProductOrderHistory', () => {
     const arg = vi.mocked(orderItemService.findProductHistory).mock.calls[0][0] as any;
     expect(arg.pagination.skip).toBe(10);
     expect(arg.deliveryDateRange.start).toBeInstanceOf(Date);
+  });
+});
+
+describe('listProducts supplierCount', () => {
+  it('adds supplierCount with one count query, 0 when no links', async () => {
+    repo.list.mockResolvedValue({ data: [{ _id: 'a' }, { _id: 'b' }], page: 1, pageSize: 2, total: 2, zeroBuyPriceCount: null } as any);
+    vi.mocked(productSuppliersRepository.countByProductIds).mockResolvedValue(new Map([['a', 3]]));
+    const res = await productService.listProducts(1, 2);
+    expect(res.data).toEqual([{ _id: 'a', supplierCount: 3 }, { _id: 'b', supplierCount: 0 }]);
+    expect(productSuppliersRepository.countByProductIds).toHaveBeenCalledTimes(1);
+    expect(productSuppliersRepository.countByProductIds).toHaveBeenCalledWith(['a', 'b']);
   });
 });
