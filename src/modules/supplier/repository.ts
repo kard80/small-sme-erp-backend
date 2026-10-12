@@ -104,6 +104,9 @@ export const productSuppliersRepository = {
   async countByProductIds(productIds: string[]) {
     const rows = await ProductSupplierModel.aggregate<{ _id: Types.ObjectId; count: number }>([
       { $match: { productId: { $in: productIds.map((id) => new Types.ObjectId(id)) } } },
+      { $lookup: { from: SupplierModel.collection.name, localField: 'supplierId', foreignField: '_id', as: 'supplier' } },
+      { $unwind: '$supplier' },
+      { $match: { 'supplier.deletedAt': null } },
       { $group: { _id: '$productId', count: { $sum: 1 } } }
     ]);
     return new Map(rows.map((r) => [String(r._id), r.count]));
