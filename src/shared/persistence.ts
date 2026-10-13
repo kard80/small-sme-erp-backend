@@ -1,6 +1,6 @@
 import mongoose, { ClientSession, Schema, model, models } from 'mongoose';
 import { logger } from './logger';
-import { Customer, Order, OrderItem, PhotoImport, Product, ProductStatus, ProductSupplier, Supplier, Unit } from './types';
+import { Customer, Expense, ExpenseItem, Order, OrderItem, PhotoImport, Product, ProductStatus, ProductSupplier, Supplier, Unit } from './types';
 
 mongoose.set('strictQuery', true);
 
@@ -24,6 +24,8 @@ export const collectionNames = {
   unit: 'units',
   customer: 'customers',
   supplier: 'suppliers',
+  expense: 'expenses',
+  expenseItem: 'expense_items',
   productSupplier: 'product_suppliers',
   order: 'orders',
   orderItem: 'order_items',
@@ -71,6 +73,19 @@ const supplierSchema = createBaseSchema<Supplier>({
     remark: { type: String, required: false, trim: true }
 });
 supplierSchema.index({ supplierName: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
+
+const expenseSchema = createBaseSchema<Expense>({
+    item: { type: String, required: true, trim: true },
+    amount: { type: Number, required: true, min: 0 },
+    note: { type: String, required: false, trim: true },
+    expenseDate: { type: Date, required: true }
+});
+expenseSchema.index({ expenseDate: -1, createdAt: -1 });
+
+const expenseItemSchema = createBaseSchema<ExpenseItem>({
+    itemName: { type: String, required: true, trim: true }
+});
+expenseItemSchema.index({ itemName: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
 
 const productSupplierSchema = createBaseSchema<ProductSupplier>({
     productId: { type: Schema.Types.ObjectId, required: true, index: true },
@@ -148,6 +163,9 @@ export const ProductModel = models.Product || model<Product>('Product', productS
 export const UnitModel = models.Unit || model<Unit>('Unit', unitSchema, collectionNames.unit);
 export const CustomerModel = models.Customer || model<Customer>('Customer', customerSchema, collectionNames.customer);
 export const SupplierModel = models.Supplier || model<Supplier>('Supplier', supplierSchema, collectionNames.supplier);
+export const ExpenseModel = models.Expense || model<Expense>('Expense', expenseSchema, collectionNames.expense);
+export const ExpenseItemModel =
+  models.ExpenseItem || model<ExpenseItem>('ExpenseItem', expenseItemSchema, collectionNames.expenseItem);
 export const ProductSupplierModel =
   models.ProductSupplier || model<ProductSupplier>('ProductSupplier', productSupplierSchema, collectionNames.productSupplier);
 export const OrderModel = models.Order || model<Order>('Order', orderSchema, collectionNames.order);

@@ -8,6 +8,8 @@ import { requireAuth } from '../modules/auth/middleware';
 import { createAuthRouter } from '../modules/auth/routes';
 import { createProductRouter } from '../modules/product/routes';
 import { createCustomersRouter } from '../modules/customers/routes';
+import { createExpenseItemsRouter } from '../modules/expense-item/routes';
+import { createExpensesRouter } from '../modules/expense/routes';
 import { createSuppliersRouter } from '../modules/supplier/routes';
 import { createOrderRouter } from '../modules/order/routes';
 import { createBillingNoteRouter } from '../modules/billing-note/routes';
@@ -41,6 +43,8 @@ export const createRestApp = () => {
   });
 
   apiV1.use('/auth', createAuthRouter());
+  apiV1.use('/expenses', requireAuth, createExpensesRouter());
+  apiV1.use('/expense-items', requireAuth, createExpenseItemsRouter());
   apiV1.use('/suppliers', requireAuth, createSuppliersRouter());
   apiV1.use('/products', requireAuth, createProductRouter());
   apiV1.use('/customers', requireAuth, createCustomersRouter());

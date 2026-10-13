@@ -21,6 +21,17 @@ export interface Product extends MongoEntity {
   status: ProductStatus;
 }
 
+export interface Expense extends MongoEntity {
+  item: string;
+  amount: number;
+  note?: string;
+  expenseDate: Date;
+}
+
+export interface ExpenseItem extends MongoEntity {
+  itemName: string;
+}
+
 export interface Supplier extends MongoEntity {
   supplierName: string;
   phone?: string;
