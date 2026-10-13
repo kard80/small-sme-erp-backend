@@ -20,12 +20,15 @@ export const createRestApp = () => {
   const app = express();
   const apiV1 = express.Router();
 
-  app.use(cors({
-    origin: 'https://small-sme-erp-web-433818871135.asia-southeast1.run.app',
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  }));
+  // Production (Dockerfile sets NODE_ENV=production) only trusts CORS_ORIGIN; local dev allows any origin.
+  app.use(cors(process.env.NODE_ENV === 'production'
+    ? {
+      origin: 'https://small-sme-erp-web-433818871135.asia-southeast1.run.app',
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+    }
+    : { origin: true, credentials: true }));
 
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
   app.use(express.json());
