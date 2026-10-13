@@ -19,11 +19,14 @@ export const createExpensesRouter = () => {
 
   router.get('/', async (req, res) => {
     const parsed = paginationSchema.safeParse(req.query);
-    if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.flatten() });
+    const dates = expenseSummaryQuerySchema.safeParse(req.query);
+    if (!parsed.success || !dates.success) {
+      return res.status(400).json({ error: (parsed.success ? dates : parsed).error!.flatten() });
     }
 
-    return res.json(await expenseService.listExpenses(parsed.data.page, parsed.data.pageSize));
+    return res.json(
+      await expenseService.listExpenses(parsed.data.page, parsed.data.pageSize, dates.data.startDate, dates.data.endDate)
+    );
   });
 
   // Declared before /:id so 'summary' is not parsed as an id.

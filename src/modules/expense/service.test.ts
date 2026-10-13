@@ -11,7 +11,7 @@ describe('expenseService', () => {
   it('delegates to the repository', async () => {
     vi.mocked(expensesRepository.list).mockResolvedValue({ data: [] } as any);
     await expenseService.listExpenses(2, 5);
-    expect(expensesRepository.list).toHaveBeenCalledWith(2, 5);
+    expect(expensesRepository.list).toHaveBeenCalledWith(2, 5, undefined, undefined);
     await expenseService.getExpense('i');
     expect(expensesRepository.findById).toHaveBeenCalledWith('i');
     await expenseService.updateExpense('i', { amount: 1 });

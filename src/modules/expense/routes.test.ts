@@ -47,7 +47,7 @@ describe('expenses routes', () => {
   it('GET list passes paging; GET :id validates id and 404s', async () => {
     vi.mocked(expenseService.listExpenses).mockResolvedValue({ data: [] } as any);
     await request(app).get(`${url}?page=2&pageSize=5`).set(auth());
-    expect(expenseService.listExpenses).toHaveBeenCalledWith(2, 5);
+    expect(expenseService.listExpenses).toHaveBeenCalledWith(2, 5, undefined, undefined);
     expect((await request(app).get(`${url}/bad`).set(auth())).status).toBe(400);
     vi.mocked(expenseService.getExpense).mockResolvedValue(null as any);
     expect((await request(app).get(`${url}/${oid}`).set(auth())).status).toBe(404);
@@ -79,5 +79,12 @@ describe('expenses routes', () => {
     expect(ok.status).toBe(200);
     expect(expenseService.getSummary).toHaveBeenCalledWith('2026-01-01', undefined);
     expect((await request(app).get(`${url}/summary?startDate=bad`).set(auth())).status).toBe(400);
+  });
+
+  it('GET / passes the date range and rejects a bad one', async () => {
+    vi.mocked(expenseService.listExpenses).mockResolvedValue({ data: [] } as any);
+    await request(app).get(`${url}?startDate=2026-01-01&endDate=2026-01-31`).set(auth());
+    expect(expenseService.listExpenses).toHaveBeenCalledWith(1, 10, '2026-01-01', '2026-01-31');
+    expect((await request(app).get(`${url}?endDate=nope`).set(auth())).status).toBe(400);
   });
 });

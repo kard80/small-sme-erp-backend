@@ -5,8 +5,8 @@ export const expenseService = {
     return expensesRepository.create(input);
   },
 
-  listExpenses(page: number, pageSize: number) {
-    return expensesRepository.list(page, pageSize);
+  listExpenses(page: number, pageSize: number, startDate?: string, endDate?: string) {
+    return expensesRepository.list(page, pageSize, startDate, endDate);
   },
 
   async getSummary(startDate?: string, endDate?: string) {

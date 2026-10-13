@@ -20,33 +20,38 @@ const toUpdateOps = (input: EntityPatch<Expense, never>) => {
   return { ...(Object.keys($set).length && { $set }), ...(input.note === '' && { $unset: { note: 1 } }) };
 };
 
+// expenseDate is stored at UTC midnight, so YYYY-MM-DD bounds compare exactly.
+const dateFilter = (startDate?: string, endDate?: string) => {
+  const range = {
+    ...(startDate && { $gte: new Date(`${startDate}T00:00:00.000Z`) }),
+    ...(endDate && { $lte: new Date(`${endDate}T00:00:00.000Z`) })
+  };
+  return Object.keys(range).length ? { expenseDate: range } : {};
+};
+
 export const expensesRepository = {
   async create(input: NewEntity<Expense, never>, session?: ClientSession) {
     const [expense] = await ExpenseModel.create([toCreateDoc(input)], { session });
     return expense.toObject();
   },
 
-  async list(page: number, pageSize: number) {
+  async list(page: number, pageSize: number, startDate?: string, endDate?: string) {
+    const filter = { deletedAt: null, ...dateFilter(startDate, endDate) };
     const [data, total] = await Promise.all([
-      ExpenseModel.find({ deletedAt: null })
+      ExpenseModel.find(filter)
         .sort({ expenseDate: -1, createdAt: -1 })
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .lean<Expense[]>(),
-      ExpenseModel.countDocuments({ deletedAt: null })
+      ExpenseModel.countDocuments(filter)
     ]);
 
     return { data, page, pageSize, total };
   },
 
-  // expenseDate is stored at UTC midnight, so YYYY-MM-DD bounds compare exactly.
   async summary(startDate?: string, endDate?: string) {
-    const range = {
-      ...(startDate && { $gte: new Date(`${startDate}T00:00:00.000Z`) }),
-      ...(endDate && { $lte: new Date(`${endDate}T00:00:00.000Z`) })
-    };
     const byItem = await ExpenseModel.aggregate<{ item: string; total: number }>([
-      { $match: { deletedAt: null, ...(Object.keys(range).length && { expenseDate: range }) } },
+      { $match: { deletedAt: null, ...dateFilter(startDate, endDate) } },
       { $group: { _id: '$item', total: { $sum: '$amount' } } },
       { $project: { _id: 0, item: '$_id', total: 1 } },
       { $sort: { total: -1, item: 1 } }
