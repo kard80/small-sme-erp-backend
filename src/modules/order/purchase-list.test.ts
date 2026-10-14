@@ -33,6 +33,7 @@ describe('buildPurchaseListHtml', () => {
     );
     expect(html).toContain('&lt;x&gt;');
     expect(html).toContain('หมายเหตุ');
+    expect(html.indexOf('ลำดับที่')).toBeLessThan(html.indexOf('สินค้า</th>'));
     expect(html).not.toMatch(/ราคา/);
   });
 });

@@ -39,15 +39,15 @@ export const buildPurchaseListHtml = (order: Order, groups: PurchaseListGroup[])
   table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
   tr { page-break-inside: avoid; }
   th, td { border: 1px solid #444; padding: 3px 6px; text-align: left; }
-  .num { text-align: right; width: 70px; } .unit { width: 70px; } .note { width: 30%; }
+  .seq { width: 50px; text-align: center; } .num { text-align: right; width: 70px; } .unit { width: 70px; } .note { width: 30%; }
 </style></head><body>
   <div>คำสั่งซื้อ: ${escapeHtml(String(order._id))}</div>
   <div>ลูกค้า: ${escapeHtml(order.customerBillName)}</div>
   <div>วันที่ส่งของ: ${escapeHtml(formatThaiDate(order.deliveryDate))}</div>
   ${groups.map((g) => `
     <h2>${escapeHtml(g.supplierName)}</h2>
-    <table><thead><tr><th>สินค้า</th><th class="num">จำนวน</th><th class="unit">หน่วย</th><th class="note">หมายเหตุ</th></tr></thead>
-    <tbody>${g.items.map((i) => `<tr><td>${escapeHtml(i.productName)}</td><td class="num">${escapeHtml(String(i.quantity))}</td><td>${escapeHtml(i.unit)}</td><td></td></tr>`).join('')}</tbody></table>`).join('')}
+    <table><thead><tr><th class="seq">ลำดับที่</th><th>สินค้า</th><th class="num">จำนวน</th><th class="unit">หน่วย</th><th class="note">หมายเหตุ</th></tr></thead>
+    <tbody>${g.items.map((i, idx) => `<tr><td class="seq">${idx + 1}</td><td>${escapeHtml(i.productName)}</td><td class="num">${escapeHtml(String(i.quantity))}</td><td>${escapeHtml(i.unit)}</td><td></td></tr>`).join('')}</tbody></table>`).join('')}
 </body></html>`;
 
 export const generatePurchaseListPdf = (order: Order, groups: PurchaseListGroup[]) =>
