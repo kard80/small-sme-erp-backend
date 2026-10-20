@@ -21,3 +21,11 @@ export const createBillingNoteDto = z.object({
 export const manualInsertBillingNoteDto = z.object({
   billingNoteId: objectIdSchema
 });
+
+export const customDocumentDto = z.object({
+  title: z.string().trim().min(1),
+  documentNumber: z.string().trim().min(1),
+  signerLabel: z.string().trim().min(1).optional(),
+  issuedDate: z.coerce.date(),
+  orderIds: z.array(objectIdSchema).nonempty('Order IDs cannot be empty')
+});

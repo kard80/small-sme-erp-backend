@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createBillingNoteDto, getBillingNotesDto, getEligibleOrdersDto, manualInsertBillingNoteDto } from './dto';
+import { createBillingNoteDto, customDocumentDto, getBillingNotesDto, getEligibleOrdersDto, manualInsertBillingNoteDto } from './dto';
 import z from 'zod';
 import { billingNoteService } from './services/service';
 
@@ -57,6 +57,16 @@ export const createBillingNoteRouter = () => {
     const response = await billingNoteService.createBillingNote(data.orderIds, data.issuedDate, data.customerId);
 
     res.status(201).json(response);
+  });
+
+  router.post('/custom-document', async (req, res) => {
+    const { success, error, data } = customDocumentDto.safeParse(req.body);
+    if (!success) {
+      return res.status(400).json({ error: z.flattenError(error) });
+    }
+
+    const pdf = await billingNoteService.renderCustomDocument(data);
+    res.status(200).type('application/pdf').send(Buffer.from(pdf));
   });
 
   router.get('/:billingNoteId/document', async (req, res) => {

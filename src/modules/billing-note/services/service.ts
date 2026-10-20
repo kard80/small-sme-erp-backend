@@ -198,6 +198,34 @@ export const billingNoteService = {
     return billingNoteDocument;
   },
 
+  // Stateless: renders a PDF for orders of any customers; nothing is persisted or uploaded.
+  async renderCustomDocument(input: { title: string; documentNumber: string;
+    signerLabel?: string;
+    issuedDate: Date;
+    orderIds: string[];
+  }) {
+    const orders = await orderService.listOrders({
+      where: { _id: new ComparableFilter<string>({ $in: input.orderIds }) },
+      pagination: new Pagination(1, input.orderIds.length),
+      sort: { deliveryNote: 1 }
+    });
+    if (orders.data.length !== input.orderIds.length) {
+      throw new NotFoundError('ไม่พบคำสั่งซื้อบางรายการ');
+    }
+
+    const total = orders.data.reduce((sum, order) => sum.add(new Currency(order.totalAmount)), new Currency(0));
+    const html = buildBillingNoteDocumentHtml(
+      { billName: 'เรือนจำจังหวัดสระแก้ว', address: '116/16 ม.21 ต.สระขวัญ อ.เมือง จ.สระแก้ว' },
+      orders.data,
+      input.documentNumber,
+      input.issuedDate,
+      total.toNumber(),
+      input.title,
+      input.signerLabel
+    );
+    return renderHtmlToPdf(html);
+  },
+
   async deleteBillingNote(billingNoteId: string) {
     const billingNote = await billingNoteRepository.findById(billingNoteId);
     if (!billingNote) {

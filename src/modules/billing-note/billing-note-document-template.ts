@@ -77,11 +77,13 @@ const buildOrderRows = (orders: Order[]) => {
 };
 
 export const buildBillingNoteDocumentHtml = (
-  customer: Customer,
+  customer: Pick<Customer, 'billName' | 'address'>,
   orders: Order[],
   documentNumber: string,
   issueDate: Date,
-  totalAmount: number
+  totalAmount: number,
+  title = 'ใบวางบิล',
+  signerLabel = 'ผู้วางบิล'
 ) => {
   const rowsMarkup = buildOrderRows(orders);
   const amountInThaiText = convertAmountToThaiText(totalAmount);
@@ -152,8 +154,8 @@ export const buildBillingNoteDocumentHtml = (
       .title-block h1 {
         margin: 0;
         font-size: 26px;
-        line-height: 1.15;
-        letter-spacing: -0.02em;
+        line-height: 1.5;
+        letter-spacing: 0;
       }
 
       .seller-name {
@@ -369,7 +371,7 @@ export const buildBillingNoteDocumentHtml = (
     <main class="document">
       <section class="header">
         <div class="title-block">
-          <h1>ใบวางบิล</h1>
+          <h1>${escapeHtml(title)}</h1>
           <div class="seller-name">${escapeHtml(sellerName)}</div>
           <div class="seller-detail">${escapeHtml(sellerAddress)}</div>
           <div class="seller-detail">${escapeHtml(sellerTaxId)}</div>
@@ -389,7 +391,7 @@ export const buildBillingNoteDocumentHtml = (
       <section class="customer-card">
         <p class="customer-heading">ข้อมูลลูกค้า</p>
         <p class="customer-name">${escapeHtml(customer.billName)}</p>
-        <p class="customer-address">${escapeHtml(customer.address)}</p>
+        ${customer.address ? `<p class="customer-address">${escapeHtml(customer.address)}</p>` : ''}
         <p class="customer-address">เลขประจำตัวผู้เสียภาษี 0994000284314</p>
       </section>
 
@@ -423,7 +425,7 @@ export const buildBillingNoteDocumentHtml = (
           <div class="signature-row">
             <span>ลงชื่อ</span>
             <span class="signature-blank"></span>
-            <span>ผู้วางบิล</span>
+            <span>${escapeHtml(signerLabel)}</span>
           </div>
           <p class="signature-role">(________________________________)</p>
         </div>
