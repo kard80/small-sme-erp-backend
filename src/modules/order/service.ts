@@ -11,7 +11,7 @@ import { orderRepository } from './repository/order.repository';
 import { ListOrdersProps, OrderWithEditable } from './types';
 import { Currency } from '../../shared/currency';
 import { productSuppliersRepository, suppliersRepository } from '../supplier/repository';
-import { generatePurchaseListPdf, groupItemsBySupplier } from './purchase-list';
+import { generateCombinedPurchaseListPdf, generatePurchaseListPdf, groupItemsBySupplier, mergeItemsByProduct } from './purchase-list';
 import { billingNoteOrderRepository } from '../billing-note/repository/billing-note-order.repository';
 
 const log = logger.child({ module: 'order' });
@@ -412,6 +412,20 @@ export const orderService = {
     const suppliers = await suppliersRepository.findByIds([...new Set(links.map((l) => String(l.supplierId)))]);
     const groups = groupItemsBySupplier(orderItems, links, suppliers);
     return generatePurchaseListPdf(order, groups);
+  },
+
+  // Stateless: one purchase list for several orders, grouped by supplier with quantities summed per product.
+  async getCombinedPurchaseListPdf(orderIds: string[]) {
+    const results = await Promise.all([...new Set(orderIds)].map((id) => this.getOrderWithItems(id)));
+    if (results.some((r) => !r)) {
+      throw new NotFoundError('ไม่พบคำสั่งซื้อบางรายการ');
+    }
+    const found = results as NonNullable<(typeof results)[number]>[];
+    const items = mergeItemsByProduct(found.flatMap((r) => r.orderItems));
+
+    const links = await productSuppliersRepository.findByProductIds(items.map((i) => String(i.productId)));
+    const suppliers = await suppliersRepository.findByIds([...new Set(links.map((l) => String(l.supplierId)))]);
+    return generateCombinedPurchaseListPdf(found.map((r) => r.order), groupItemsBySupplier(items, links, suppliers));
   },
 
   async createDeliveryNote(orderId: string) {

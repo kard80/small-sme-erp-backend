@@ -9,6 +9,7 @@ vi.mock('./service', () => ({
     getSummary: vi.fn(),
     getDeliveryNoteDownloadUrl: vi.fn(),
     getPurchaseListPdf: vi.fn(),
+    getCombinedPurchaseListPdf: vi.fn(),
     createDeliveryNote: vi.fn(),
     getOrderWithItems: vi.fn(),
     updateOrder: vi.fn(),
@@ -127,5 +128,20 @@ describe('GET /:orderId/purchase-list', () => {
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'ไม่พบคำสั่งซื้อ' });
     expect((await request(app).get(`/api/v1/orders/${oid}/purchase-list`)).status).toBe(401);
+  });
+});
+
+describe('POST /orders/purchase-lists/combined', () => {
+  it('rejects an empty orderIds list', async () => {
+    const res = await request(app).post('/api/v1/orders/purchase-lists/combined').set(auth()).send({ orderIds: [] });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns the merged pdf', async () => {
+    vi.mocked(orderService.getCombinedPurchaseListPdf).mockResolvedValue(new Uint8Array([37, 80, 68, 70]));
+    const res = await request(app).post('/api/v1/orders/purchase-lists/combined').set(auth()).send({ orderIds: [oid] });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(orderService.getCombinedPurchaseListPdf).toHaveBeenCalledWith([oid]);
   });
 });

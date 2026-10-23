@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { describe, expect, it } from 'vitest';
-import { buildPurchaseListHtml, groupItemsBySupplier } from './purchase-list';
+import { buildPurchaseListHtml, groupItemsBySupplier, mergeItemsByProduct } from './purchase-list';
 
 const id = () => new Types.ObjectId();
 const [p1, p2, p3, sA, sB, sDel] = [id(), id(), id(), id(), id(), id()];
@@ -35,5 +35,13 @@ describe('buildPurchaseListHtml', () => {
     expect(html).toContain('หมายเหตุ');
     expect(html.indexOf('ลำดับที่')).toBeLessThan(html.indexOf('สินค้า</th>'));
     expect(html).not.toMatch(/ราคา/);
+  });
+});
+
+describe('mergeItemsByProduct', () => {
+  it('sums quantity for the same product and unit only', () => {
+    const item = (productId: string, unit: string, quantity: number) => ({ productId, unit, quantity }) as never;
+    const merged = mergeItemsByProduct([item('a', 'kg', 1), item('a', 'kg', 2), item('a', 'box', 5), item('b', 'kg', 1)]);
+    expect(merged.map((i) => [i.productId, i.unit, i.quantity])).toEqual([['a', 'kg', 3], ['a', 'box', 5], ['b', 'kg', 1]]);
   });
 });
