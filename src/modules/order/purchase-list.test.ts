@@ -5,7 +5,7 @@ import { buildPurchaseListHtml, groupItemsBySupplier, mergeItemsByProduct } from
 const id = () => new Types.ObjectId();
 const [p1, p2, p3, sA, sB, sDel] = [id(), id(), id(), id(), id(), id()];
 const item = (productId: Types.ObjectId, productName: string) =>
-  ({ productId, productName, quantity: 2, unit: 'kg' }) as never;
+  ({ productId, productName, quantity: 2, unit: 'kg', buyPrice: 10 }) as never;
 const link = (productId: Types.ObjectId, supplierId: Types.ObjectId, priority: number) =>
   ({ productId, supplierId, priority }) as never;
 const sup = (_id: Types.ObjectId, supplierName: string) => ({ _id, supplierName }) as never;
@@ -26,7 +26,7 @@ describe('groupItemsBySupplier', () => {
 });
 
 describe('buildPurchaseListHtml', () => {
-  it('has header, note column and no prices', () => {
+  it('has header, note and cost columns, no sell price', () => {
     const html = buildPurchaseListHtml(
       { _id: id(), customerBillName: '<x>', deliveryDate: new Date('2026-01-31') } as never,
       groupItemsBySupplier([item(p1, 'a')], [], [])
@@ -34,6 +34,9 @@ describe('buildPurchaseListHtml', () => {
     expect(html).toContain('&lt;x&gt;');
     expect(html).toContain('หมายเหตุ');
     expect(html.indexOf('ลำดับที่')).toBeLessThan(html.indexOf('สินค้า</th>'));
+    expect(html).toContain('ต้นทุน');
+    expect(html).toContain('10.00');
+    expect(buildPurchaseListHtml({ _id: id(), customerBillName: 'x', deliveryDate: new Date() } as never, groupItemsBySupplier([{ ...(item(p1, 'a') as object), buyPrice: 0 } as never], [], []))).toContain('<td class="num">-</td>');
     expect(html).not.toMatch(/ราคา/);
   });
 });

@@ -27,5 +27,7 @@ export const orderInputSchema = z.object({
 export const orderUpdateSchema = orderInputSchema.partial();
 
 export const combinedPurchaseListSchema = z.object({
-  orderIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).nonempty('Order IDs cannot be empty')
+  orderIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).nonempty('Order IDs cannot be empty'),
+  // supplier ObjectIds or 'none' (products without a supplier); omitted = all
+  supplierIds: z.array(z.string().regex(/^([0-9a-fA-F]{24}|none)$/)).optional()
 });

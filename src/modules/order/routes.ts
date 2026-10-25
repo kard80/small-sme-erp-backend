@@ -52,13 +52,22 @@ export const createOrderRouter = () => {
     return res.json(await orderService.getSummary(startDate, endDate));
   });
 
+  router.post('/purchase-lists/suppliers', async (req, res) => {
+    const input = combinedPurchaseListSchema.safeParse(req.body);
+    if (!input.success) {
+      return sendZodError(res, input.error);
+    }
+
+    return res.json(await orderService.listCombinedPurchaseListSuppliers(input.data.orderIds));
+  });
+
   router.post('/purchase-lists/combined', async (req, res) => {
     const input = combinedPurchaseListSchema.safeParse(req.body);
     if (!input.success) {
       return sendZodError(res, input.error);
     }
 
-    const pdf = await orderService.getCombinedPurchaseListPdf(input.data.orderIds);
+    const pdf = await orderService.getCombinedPurchaseListPdf(input.data.orderIds, input.data.supplierIds);
     return res.status(200).type('application/pdf').send(Buffer.from(pdf));
   });
 

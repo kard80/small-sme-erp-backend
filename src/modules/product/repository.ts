@@ -76,6 +76,10 @@ export const productRepository = {
     return ProductModel.findOne({ _id, status: 'active' }).lean<Product | null>();
   },
 
+  findByIds(ids: string[]) {
+    return ProductModel.find({ _id: { $in: ids } }).select('defaultBuyPrice').lean<Pick<Product, '_id' | 'defaultBuyPrice'>[]>();
+  },
+
   findByProductName(productName: string) {
     return ProductModel.findOne({ productName, status: 'active' }).lean<Product | null>();
   },

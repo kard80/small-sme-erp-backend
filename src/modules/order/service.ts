@@ -1,4 +1,5 @@
 import { ClientSession } from 'mongoose';
+import { productRepository } from '../product/repository';
 import { customersRepository } from '../customers/repository';
 import { orderItemRepository } from './repository/order-item.repository';
 import { CreateOrderInput, Order } from '../../shared/types';
@@ -414,18 +415,37 @@ export const orderService = {
     return generatePurchaseListPdf(order, groups);
   },
 
-  // Stateless: one purchase list for several orders, grouped by supplier with quantities summed per product.
-  async getCombinedPurchaseListPdf(orderIds: string[]) {
+  // Stateless: purchase list groups (by supplier) for several orders, quantities summed per product.
+  async getCombinedPurchaseListGroups(orderIds: string[]) {
     const results = await Promise.all([...new Set(orderIds)].map((id) => this.getOrderWithItems(id)));
     if (results.some((r) => !r)) {
       throw new NotFoundError('ไม่พบคำสั่งซื้อบางรายการ');
     }
     const found = results as NonNullable<(typeof results)[number]>[];
-    const items = mergeItemsByProduct(found.flatMap((r) => r.orderItems));
+    const merged = mergeItemsByProduct(found.flatMap((r) => r.orderItems));
+    // cost comes from the product's configured default buy price, not the per-order price
+    const products = await productRepository.findByIds([...new Set(merged.map((i) => String(i.productId)))]);
+    const costs = new Map(products.map((p) => [String(p._id), p.defaultBuyPrice ?? 0]));
+    const items = merged.map((i) => ({ ...i, buyPrice: costs.get(String(i.productId)) ?? 0 }));
 
     const links = await productSuppliersRepository.findByProductIds(items.map((i) => String(i.productId)));
     const suppliers = await suppliersRepository.findByIds([...new Set(links.map((l) => String(l.supplierId)))]);
-    return generateCombinedPurchaseListPdf(found.map((r) => r.order), groupItemsBySupplier(items, links, suppliers));
+    return { orders: found.map((r) => r.order), groups: groupItemsBySupplier(items, links, suppliers) };
+  },
+
+  async listCombinedPurchaseListSuppliers(orderIds: string[]) {
+    const { groups } = await this.getCombinedPurchaseListGroups(orderIds);
+    return groups.map(({ supplierId, supplierName }) => ({ supplierId, supplierName }));
+  },
+
+  // supplierIds omitted = every supplier group
+  async getCombinedPurchaseListPdf(orderIds: string[], supplierIds?: string[]) {
+    const { orders, groups } = await this.getCombinedPurchaseListGroups(orderIds);
+    const selected = supplierIds ? groups.filter((g) => supplierIds.includes(g.supplierId)) : groups;
+    if (selected.length === 0) {
+      throw new NotFoundError('ไม่พบรายการซื้อของผู้ขายที่เลือก');
+    }
+    return generateCombinedPurchaseListPdf(orders, selected);
   },
 
   async createDeliveryNote(orderId: string) {

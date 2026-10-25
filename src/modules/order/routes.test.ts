@@ -142,6 +142,15 @@ describe('POST /orders/purchase-lists/combined', () => {
     const res = await request(app).post('/api/v1/orders/purchase-lists/combined').set(auth()).send({ orderIds: [oid] });
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('application/pdf');
-    expect(orderService.getCombinedPurchaseListPdf).toHaveBeenCalledWith([oid]);
+    expect(orderService.getCombinedPurchaseListPdf).toHaveBeenCalledWith([oid], undefined);
+  });
+
+  it('passes the supplier selection through and rejects bad ids', async () => {
+    vi.mocked(orderService.getCombinedPurchaseListPdf).mockResolvedValue(new Uint8Array([37]));
+    const ok = await request(app).post('/api/v1/orders/purchase-lists/combined').set(auth()).send({ orderIds: [oid], supplierIds: [oid, 'none'] });
+    expect(ok.status).toBe(200);
+    expect(orderService.getCombinedPurchaseListPdf).toHaveBeenCalledWith([oid], [oid, 'none']);
+    const bad = await request(app).post('/api/v1/orders/purchase-lists/combined').set(auth()).send({ orderIds: [oid], supplierIds: ['x'] });
+    expect(bad.status).toBe(400);
   });
 });

@@ -3,30 +3,32 @@ import { Order, OrderItem, ProductSupplier, Supplier } from '../../shared/types'
 import { deliveryNoteFontFaceCss, escapeHtml, formatThaiDate } from './delivery-note-template';
 
 export const noSupplierGroupName = 'ไม่มีชื่อผู้ขาย';
+export const noSupplierId = 'none';
 const thaiCollator = new Intl.Collator('th');
 
 // links must be sorted by priority ASC; each product goes to its first link whose supplier exists
 // (soft-deleted suppliers are absent from `suppliers`). `condition` is ignored.
 export const groupItemsBySupplier = (items: OrderItem[], links: ProductSupplier[], suppliers: Supplier[]) => {
   const supplierNames = new Map(suppliers.map((s) => [String(s._id), s.supplierName]));
-  const productSupplierName = new Map<string, string>();
+  const productSupplier = new Map<string, { supplierId: string; supplierName: string }>();
   for (const link of links) {
-    const name = supplierNames.get(String(link.supplierId));
-    if (name && !productSupplierName.has(String(link.productId))) {
-      productSupplierName.set(String(link.productId), name);
+    const supplierId = String(link.supplierId);
+    const supplierName = supplierNames.get(supplierId);
+    if (supplierName && !productSupplier.has(String(link.productId))) {
+      productSupplier.set(String(link.productId), { supplierId, supplierName });
     }
   }
 
-  const groups = new Map<string, OrderItem[]>();
+  const groups = new Map<string, { supplierId: string; supplierName: string; items: OrderItem[] }>();
   for (const item of items) {
-    const name = productSupplierName.get(String(item.productId)) ?? noSupplierGroupName;
-    groups.set(name, [...(groups.get(name) ?? []), item]);
+    const sup = productSupplier.get(String(item.productId)) ?? { supplierId: noSupplierId, supplierName: noSupplierGroupName };
+    const group = groups.get(sup.supplierId) ?? { ...sup, items: [] };
+    group.items.push(item);
+    groups.set(sup.supplierId, group);
   }
 
-  return [...groups]
-    .sort(([a], [b]) =>
-      a === noSupplierGroupName ? 1 : b === noSupplierGroupName ? -1 : thaiCollator.compare(a, b))
-    .map(([supplierName, groupItems]) => ({ supplierName, items: groupItems }));
+  return [...groups.values()].sort((a, b) =>
+    a.supplierId === noSupplierId ? 1 : b.supplierId === noSupplierId ? -1 : thaiCollator.compare(a.supplierName, b.supplierName));
 };
 
 export type PurchaseListGroup = ReturnType<typeof groupItemsBySupplier>[number];
@@ -42,6 +44,9 @@ export const mergeItemsByProduct = (items: OrderItem[]) => {
   return [...merged.values()];
 };
 
+// 0 = no price configured
+const formatCost = (n: number) => !n ? '-' : n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 const renderPurchaseListHtml = (headerLines: string[], groups: PurchaseListGroup[]) => `<!doctype html>
 <html lang="th"><head><meta charset="utf-8"><style>
   ${deliveryNoteFontFaceCss}
@@ -55,8 +60,8 @@ const renderPurchaseListHtml = (headerLines: string[], groups: PurchaseListGroup
   ${headerLines.map((line) => `<div>${escapeHtml(line)}</div>`).join('')}
   ${groups.map((g) => `
     <h2>${escapeHtml(g.supplierName)}</h2>
-    <table><thead><tr><th class="seq">ลำดับที่</th><th>สินค้า</th><th class="num">จำนวน</th><th class="unit">หน่วย</th><th class="note">หมายเหตุ</th></tr></thead>
-    <tbody>${g.items.map((i, idx) => `<tr><td class="seq">${idx + 1}</td><td>${escapeHtml(i.productName)}</td><td class="num">${escapeHtml(String(i.quantity))}</td><td>${escapeHtml(i.unit)}</td><td></td></tr>`).join('')}</tbody></table>`).join('')}
+    <table><thead><tr><th class="seq">ลำดับที่</th><th>สินค้า</th><th class="num">จำนวน</th><th class="unit">หน่วย</th><th class="num">ต้นทุน</th><th class="note">หมายเหตุ</th></tr></thead>
+    <tbody>${g.items.map((i, idx) => `<tr><td class="seq">${idx + 1}</td><td>${escapeHtml(i.productName)}</td><td class="num">${escapeHtml(String(i.quantity))}</td><td>${escapeHtml(i.unit)}</td><td class="num">${escapeHtml(formatCost(i.buyPrice))}</td><td></td></tr>`).join('')}</tbody></table>`).join('')}
 </body></html>`;
 
 export const buildPurchaseListHtml = (order: Order, groups: PurchaseListGroup[]) =>
