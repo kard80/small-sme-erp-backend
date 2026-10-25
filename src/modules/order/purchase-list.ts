@@ -55,13 +55,14 @@ const renderPurchaseListHtml = (headerLines: string[], groups: PurchaseListGroup
   table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
   tr { page-break-inside: avoid; }
   th, td { border: 1px solid #444; padding: 3px 6px; text-align: left; }
-  .seq { width: 50px; text-align: center; } .num { text-align: right; width: 70px; } .unit { width: 70px; } .note { width: 30%; }
+  .seq { width: 50px; text-align: center; } .num { text-align: right; width: 70px; } .unit { width: 70px; } .total { text-align: right; font-weight: bold; } tfoot td { font-weight: bold; } .note { width: 30%; }
 </style></head><body>
   ${headerLines.map((line) => `<div>${escapeHtml(line)}</div>`).join('')}
   ${groups.map((g) => `
     <h2>${escapeHtml(g.supplierName)}</h2>
-    <table><thead><tr><th class="seq">ลำดับที่</th><th>สินค้า</th><th class="num">จำนวน</th><th class="unit">หน่วย</th><th class="num">ต้นทุน</th><th class="note">หมายเหตุ</th></tr></thead>
-    <tbody>${g.items.map((i, idx) => `<tr><td class="seq">${idx + 1}</td><td>${escapeHtml(i.productName)}</td><td class="num">${escapeHtml(String(i.quantity))}</td><td>${escapeHtml(i.unit)}</td><td class="num">${escapeHtml(formatCost(i.buyPrice))}</td><td></td></tr>`).join('')}</tbody></table>`).join('')}
+    <table><thead><tr><th class="seq">ลำดับที่</th><th>สินค้า</th><th class="num">จำนวน</th><th class="unit">หน่วย</th><th class="num">ต้นทุน</th><th class="num">ต้นทุนรวม</th><th class="note">หมายเหตุ</th></tr></thead>
+    <tbody>${g.items.map((i, idx) => `<tr><td class="seq">${idx + 1}</td><td>${escapeHtml(i.productName)}</td><td class="num">${escapeHtml(String(i.quantity))}</td><td>${escapeHtml(i.unit)}</td><td class="num">${escapeHtml(formatCost(i.buyPrice))}</td><td class="num">${escapeHtml(formatCost(i.buyPrice * i.quantity))}</td><td></td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="5" class="total">รวมต้นทุน ${escapeHtml(g.supplierName)}</td><td class="num">${escapeHtml(formatCost(g.items.reduce((sum, i) => sum + i.buyPrice * i.quantity, 0)))}</td><td></td></tr></tfoot></table>`).join('')}
 </body></html>`;
 
 export const buildPurchaseListHtml = (order: Order, groups: PurchaseListGroup[]) =>

@@ -35,7 +35,10 @@ describe('buildPurchaseListHtml', () => {
     expect(html).toContain('หมายเหตุ');
     expect(html.indexOf('ลำดับที่')).toBeLessThan(html.indexOf('สินค้า</th>'));
     expect(html).toContain('ต้นทุน');
+    expect(html).toContain('ต้นทุนรวม');
     expect(html).toContain('10.00');
+    expect(html).toContain('20.00');
+    expect(html).toContain('รวมต้นทุน');
     expect(buildPurchaseListHtml({ _id: id(), customerBillName: 'x', deliveryDate: new Date() } as never, groupItemsBySupplier([{ ...(item(p1, 'a') as object), buyPrice: 0 } as never], [], []))).toContain('<td class="num">-</td>');
     expect(html).not.toMatch(/ราคา/);
   });
