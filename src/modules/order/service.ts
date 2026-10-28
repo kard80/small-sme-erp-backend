@@ -7,7 +7,7 @@ import { BadRequestError, InternalServerError, NotFoundError } from '../../share
 import { correctionDepartmentBucketName, createSignedObjectDownloadUrl, uploadObjectToBucket } from '../../shared/gcs';
 import { runInTransaction, withSession } from '../../shared/persistence';
 import { logger } from '../../shared/logger';
-import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
+import { CustomReceiptInput, generateCustomReceiptPdf, generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { orderRepository } from './repository/order.repository';
 import { ListOrdersProps, OrderWithEditable } from './types';
 import { Currency } from '../../shared/currency';
@@ -446,6 +446,10 @@ export const orderService = {
       throw new NotFoundError('ไม่พบรายการซื้อของผู้ขายที่เลือก');
     }
     return generateCombinedPurchaseListPdf(orders, selected);
+  },
+
+  renderCustomReceipt(input: CustomReceiptInput) {
+    return generateCustomReceiptPdf(input);
   },
 
   async createDeliveryNote(orderId: string) {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
 import { parseObjectIdParam, paginationSchema, sendZodError } from '../../shared/http';
-import { combinedPurchaseListSchema, orderInputSchema, orderUpdateSchema } from './schemas';
+import { combinedPurchaseListSchema, customReceiptSchema, orderInputSchema, orderUpdateSchema } from './schemas';
 import { orderService } from './service';
 import { Pagination } from '../../shared/pagination';
 import { ComparableFilter } from '../../shared/filters';
@@ -68,6 +68,16 @@ export const createOrderRouter = () => {
     }
 
     const pdf = await orderService.getCombinedPurchaseListPdf(input.data.orderIds, input.data.supplierIds);
+    return res.status(200).type('application/pdf').send(Buffer.from(pdf));
+  });
+
+  router.post('/custom-receipt', async (req, res) => {
+    const input = customReceiptSchema.safeParse(req.body);
+    if (!input.success) {
+      return sendZodError(res, input.error);
+    }
+
+    const pdf = await orderService.renderCustomReceipt(input.data);
     return res.status(200).type('application/pdf').send(Buffer.from(pdf));
   });
 

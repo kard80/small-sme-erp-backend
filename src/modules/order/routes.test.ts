@@ -10,6 +10,7 @@ vi.mock('./service', () => ({
     getDeliveryNoteDownloadUrl: vi.fn(),
     getPurchaseListPdf: vi.fn(),
     getCombinedPurchaseListPdf: vi.fn(),
+    renderCustomReceipt: vi.fn(),
     createDeliveryNote: vi.fn(),
     getOrderWithItems: vi.fn(),
     updateOrder: vi.fn(),
@@ -152,5 +153,33 @@ describe('POST /orders/purchase-lists/combined', () => {
     expect(orderService.getCombinedPurchaseListPdf).toHaveBeenCalledWith([oid], [oid, 'none']);
     const bad = await request(app).post('/api/v1/orders/purchase-lists/combined').set(auth()).send({ orderIds: [oid], supplierIds: ['x'] });
     expect(bad.status).toBe(400);
+  });
+});
+
+describe('POST /orders/custom-receipt', () => {
+  const body = {
+    documentNumber: 'RC-001',
+    issuedDate: '2026-10-28',
+    customerName: 'เรือนจำจังหวัดสระแก้ว',
+    items: [{ productName: 'ข้าวสาร', unit: 'กก.', quantity: 2, sellPrice: 35.5 }]
+  };
+
+  it('rejects empty items and missing customer name', async () => {
+    expect((await request(app).post('/api/v1/orders/custom-receipt').set(auth()).send({ ...body, items: [] })).status).toBe(400);
+    expect((await request(app).post('/api/v1/orders/custom-receipt').set(auth()).send({ ...body, customerName: '' })).status).toBe(400);
+  });
+
+  it('rejects an invalid date and oversized item lists', async () => {
+    expect((await request(app).post('/api/v1/orders/custom-receipt').set(auth()).send({ ...body, issuedDate: 'abc' })).status).toBe(400);
+    const items = Array.from({ length: 201 }, () => body.items[0]);
+    expect((await request(app).post('/api/v1/orders/custom-receipt').set(auth()).send({ ...body, items })).status).toBe(400);
+  });
+
+  it('returns the pdf without touching the db layer', async () => {
+    vi.mocked(orderService.renderCustomReceipt).mockResolvedValue(Buffer.from('%PDF'));
+    const res = await request(app).post('/api/v1/orders/custom-receipt').set(auth()).send(body);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(orderService.renderCustomReceipt).toHaveBeenCalledWith(expect.objectContaining({ customerAddress: '', documentNumber: 'RC-001' }));
   });
 });

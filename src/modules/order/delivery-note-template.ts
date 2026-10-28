@@ -81,7 +81,19 @@ export const formatThaiDate = (value?: Date | null) => {
   return `${day} ${month} ${year}`;
 };
 
-const buildItemRows = (items: OrderItem[]) => {
+type TemplateItem = Pick<OrderItem, 'productName' | 'quantity' | 'unit' | 'sellPrice' | 'totalSellPrice'>;
+type TemplateOrder = Pick<Order, 'deliveryDate' | 'customerBillName' | 'customerBillAddress'>;
+
+// Defaults render the delivery note; the custom receipt reuses the layout with its own title/signatures.
+export interface DocumentVariant {
+  title: string;
+  dateLabel: string;
+  signaturesHtml?: string;
+}
+
+const deliveryNoteVariant: DocumentVariant = { title: 'ใบส่งสินค้า', dateLabel: 'วันที่ส่งสินค้า' };
+
+const buildItemRows = (items: TemplateItem[]) => {
   return items
     .map((item, index) => {
       return `
@@ -98,7 +110,13 @@ const buildItemRows = (items: OrderItem[]) => {
     .join('');
 };
 
-export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], documentNumber: string, orderTotal: number) => {
+export const buildDeliveryNoteHtml = (
+  order: TemplateOrder,
+  items: TemplateItem[],
+  documentNumber: string,
+  orderTotal: number,
+  variant: DocumentVariant = deliveryNoteVariant
+) => {
   const deliveryDate = formatThaiDate(order.deliveryDate);
   const rowsMarkup = buildItemRows(items);
   const amountInThaiText = convertAmountToThaiText(orderTotal);
@@ -409,7 +427,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
     <main class="document">
       <section class="header">
         <div class="title-block">
-          <h1>ใบส่งสินค้า</h1>
+          <h1>${escapeHtml(variant.title)}</h1>
           <div class="seller-name">${escapeHtml(sellerName)}</div>
           <div class="seller-detail">${escapeHtml(sellerAddress)}</div>
           <div class="seller-detail">${escapeHtml(sellerTel)}</div>
@@ -420,7 +438,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
             <span class="meta-value">${escapeHtml(documentNumber)}</span>
           </div>
           <div class="meta-row">
-            <span class="meta-label">วันที่ส่งสินค้า</span>
+            <span class="meta-label">${escapeHtml(variant.dateLabel)}</span>
             <span class="meta-value meta-value-nowrap">${escapeHtml(deliveryDate)}</span>
           </div>
         </aside>
@@ -432,7 +450,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
         <p class="customer-address">${escapeHtml(order.customerBillAddress)}</p>
       </section>
 
-      <table aria-label="รายการสินค้าในใบส่งสินค้า">
+      <table aria-label="${escapeHtml(`รายการสินค้าใน${variant.title}`)}">
         <colgroup>
           <col class="col-index" />
           <col class="col-product" />
@@ -463,7 +481,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
       </table>
 
       <section class="summary-signatures">
-        <div class="signatures">
+        ${variant.signaturesHtml ?? `        <div class="signatures">
           <div class="signature-col">
             <div class="signature-block">
               <div class="signature-row">
@@ -496,7 +514,7 @@ export const buildDeliveryNoteHtml = (order: Order, items: OrderItem[], document
               <span>${escapeHtml('เจ้าหน้าที่')}</span>
             </div>
           </div>
-        </div>
+        </div>`}
       </section>
     </main>
   </body>

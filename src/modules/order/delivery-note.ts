@@ -3,7 +3,7 @@ import { nextSequence } from '../../shared/persistence';
 import { renderHtmlToPdf } from '../../shared/pdf';
 import { BadRequestError } from '../../shared/errors';
 import { Order, OrderItem } from '../../shared/types';
-import { buildDeliveryNoteHtml, deliveryNoteFontFaceCss, escapeHtml } from './delivery-note-template';
+import { buildDeliveryNoteHtml, DocumentVariant, deliveryNoteFontFaceCss, escapeHtml } from './delivery-note-template';
 import { Currency } from '../../shared/currency';
 
 const getDeliveryNoteMonthKey = (date: Date) => {
@@ -81,4 +81,53 @@ export const generateDeliveryNotePdfBuffer = async (
     contentType: 'application/pdf' as const,
     bytes: buffer
   };
+};
+
+const receiptSignatures = `
+  <div class="signatures">
+    <div class="signature-col">
+      <div class="signature-row">
+        <span>ลงชื่อ</span>
+        <span class="signature-blank"></span>
+        <span>ผู้จ่ายเงิน</span>
+      </div>
+    </div>
+    <div class="signature-col signature-col-right">
+      <div class="signature-row">
+        <span>ลงชื่อ</span>
+        <span class="signature-blank"></span>
+        <span>ผู้รับเงิน</span>
+      </div>
+    </div>
+  </div>`;
+
+const receiptVariant: DocumentVariant = {
+  title: 'ใบเสร็จรับเงิน',
+  dateLabel: 'วันที่',
+  signaturesHtml: receiptSignatures
+};
+
+export interface CustomReceiptInput {
+  documentNumber: string;
+  issuedDate: Date;
+  customerName: string;
+  customerAddress: string;
+  items: { productName: string; unit: string; quantity: number; sellPrice: number }[];
+}
+
+// Stateless: nothing is persisted or uploaded.
+export const generateCustomReceiptPdf = (input: CustomReceiptInput) => {
+  const items = input.items.map((item) => ({
+    ...item,
+    totalSellPrice: new Currency(item.sellPrice).multiply(item.quantity).toNumber()
+  }));
+  const total = items.reduce((sum, item) => sum.add(new Currency(item.totalSellPrice)), new Currency(0)).toNumber();
+  const html = buildDeliveryNoteHtml(
+    { deliveryDate: input.issuedDate, customerBillName: input.customerName, customerBillAddress: input.customerAddress },
+    items,
+    input.documentNumber,
+    total,
+    receiptVariant
+  );
+  return renderHtmlToPdf(html);
 };

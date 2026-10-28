@@ -31,3 +31,22 @@ export const combinedPurchaseListSchema = z.object({
   // supplier ObjectIds or 'none' (products without a supplier); omitted = all
   supplierIds: z.array(z.string().regex(/^([0-9a-fA-F]{24}|none)$/)).optional()
 });
+
+// Stateless receipt: every field is typed by the user (optionally prefilled by the client from a DN).
+export const customReceiptSchema = z.object({
+  documentNumber: z.string().trim().min(1).max(50),
+  issuedDate: thaiDate.refine((d) => !Number.isNaN(d.getTime()), 'วันที่ไม่ถูกต้อง'),
+  customerName: z.string().trim().min(1).max(200),
+  customerAddress: z.string().trim().max(500).default(''),
+  items: z
+    .array(
+      z.object({
+        productName: z.string().trim().min(1).max(200),
+        unit: z.string().trim().max(30).default(''),
+        quantity: z.coerce.number().positive(),
+        sellPrice: z.coerce.number().nonnegative()
+      })
+    )
+    .min(1)
+    .max(200)
+});
