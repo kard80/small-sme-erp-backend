@@ -11,6 +11,7 @@ vi.mock('./repository/order.repository', () => ({
     findById: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
+    existsByDeliveryNote: vi.fn(),
     getSummary: vi.fn()
   }
 }));
@@ -48,7 +49,7 @@ import { billingNoteOrderRepository } from '../billing-note/repository/billing-n
 import { generateDeliveryNoteNumber, generateDeliveryNotePdfBuffer } from './delivery-note';
 import { createSignedObjectDownloadUrl, uploadObjectToBucket } from '../../shared/gcs';
 import { Pagination } from '../../shared/pagination';
-import { BadRequestError, NotFoundError } from '../../shared/errors';
+import { ConflictError, BadRequestError, NotFoundError } from '../../shared/errors';
 
 const customers = vi.mocked(customersRepository);
 const orders = vi.mocked(orderRepository);
@@ -197,6 +198,41 @@ describe('orderService.createDeliveryNote', () => {
     orders.findById.mockResolvedValue(order());
     items.listByOrderId.mockResolvedValue([{}] as any);
     await expect(orderService.createDeliveryNote(orderId.toString())).rejects.toThrow(BadRequestError);
+  });
+});
+
+describe('orderService.createDeliveryNote custom number', () => {
+  const completed = (extra: Record<string, unknown> = {}) => order({ completedAt: new Date(), ...extra });
+
+  it('uses a unique custom number and skips the running number', async () => {
+    orders.findById.mockResolvedValue(completed());
+    items.listByOrderId.mockResolvedValue([{ totalSellPrice: 1 }] as any);
+    orders.existsByDeliveryNote.mockResolvedValue(false);
+    await orderService.createDeliveryNote(orderId.toString(), 'MY-001');
+    expect(generateDeliveryNoteNumber).not.toHaveBeenCalled();
+    expect(orders.update.mock.calls.at(-1)![1]).toEqual({ deliveryNote: 'MY-001' });
+  });
+
+  it('rejects a duplicate custom number', async () => {
+    orders.findById.mockResolvedValue(completed());
+    items.listByOrderId.mockResolvedValue([{ totalSellPrice: 1 }] as any);
+    orders.existsByDeliveryNote.mockResolvedValue(true);
+    await expect(orderService.createDeliveryNote(orderId.toString(), 'MY-001')).rejects.toThrow(ConflictError);
+  });
+
+  it('rejects changing the number once one exists', async () => {
+    orders.findById.mockResolvedValue(completed({ deliveryNote: 'DN20260101' }));
+    items.listByOrderId.mockResolvedValue([{ totalSellPrice: 1 }] as any);
+    await expect(orderService.createDeliveryNote(orderId.toString(), 'MY-001')).rejects.toThrow(BadRequestError);
+  });
+
+  it('skips generated numbers already taken by a custom entry', async () => {
+    orders.findById.mockResolvedValue(completed());
+    items.listByOrderId.mockResolvedValue([{ totalSellPrice: 1 }] as any);
+    vi.mocked(generateDeliveryNoteNumber).mockResolvedValueOnce('DN20260101').mockResolvedValueOnce('DN20260102');
+    orders.existsByDeliveryNote.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    await orderService.createDeliveryNote(orderId.toString());
+    expect(orders.update.mock.calls.at(-1)![1]).toEqual({ deliveryNote: 'DN20260102' });
   });
 });
 

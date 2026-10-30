@@ -111,6 +111,11 @@ const orderSchema = createBaseSchema<Order>({
     cancelledAt: { type: Date, required: false, default: null }
 });
 
+orderSchema.index(
+  { deliveryNote: 1 },
+  { unique: true, partialFilterExpression: { deletedAt: null, deliveryNote: { $type: 'string' } } }
+);
+
 const orderItemSchema = createBaseSchema<OrderItem>({
     orderId: { type: Schema.Types.ObjectId, required: true, index: true },
     order: { type: Number, required: true, min: 1 },

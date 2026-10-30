@@ -3,7 +3,7 @@ import { productRepository } from '../product/repository';
 import { customersRepository } from '../customers/repository';
 import { orderItemRepository } from './repository/order-item.repository';
 import { CreateOrderInput, Order } from '../../shared/types';
-import { BadRequestError, InternalServerError, NotFoundError } from '../../shared/errors';
+import { BadRequestError, ConflictError, InternalServerError, NotFoundError } from '../../shared/errors';
 import { correctionDepartmentBucketName, createSignedObjectDownloadUrl, uploadObjectToBucket } from '../../shared/gcs';
 import { runInTransaction, withSession } from '../../shared/persistence';
 import { logger } from '../../shared/logger';
@@ -92,16 +92,34 @@ const normalizeDeliveryNoteDocumentNumber = (deliveryNote?: string) => {
 };
 
 const getDeliveryNoteDocumentNumber = async (
-  order: Pick<Order, 'deliveryNote' | 'customerId' | 'deliveryDate'>,
-  session?: ClientSession
+  order: Pick<Order, '_id' | 'deliveryNote' | 'customerId' | 'deliveryDate'>,
+  session?: ClientSession,
+  customNumber?: string
 ) => {
   const existingDocumentNumber = normalizeDeliveryNoteDocumentNumber(order.deliveryNote);
   if (existingDocumentNumber) {
+    if (customNumber && customNumber !== existingDocumentNumber) {
+      throw new BadRequestError('ไม่สามารถเปลี่ยนเลขที่ใบส่งของหลังจากสร้างแล้ว');
+    }
     return existingDocumentNumber;
   }
 
+  const orderId = order._id.toString();
+  if (customNumber) {
+    if (await orderRepository.existsByDeliveryNote(customNumber, orderId, session)) {
+      throw new ConflictError(`เลขที่ใบส่งของ ${customNumber} ซ้ำกับที่มีอยู่แล้ว`);
+    }
+    return customNumber;
+  }
+
+  // Skip numbers already taken by a custom entry; the generator's 99/month cap bounds the loop.
   const customer = await customersRepository.findById(order.customerId.toString(), session);
-  return generateDeliveryNoteNumber(session, order.deliveryDate, customer ?? undefined);
+  for (;;) {
+    const generated = await generateDeliveryNoteNumber(session, order.deliveryDate, customer ?? undefined);
+    if (!(await orderRepository.existsByDeliveryNote(generated, orderId, session))) {
+      return generated;
+    }
+  }
 };
 
 // TODO: this is called with an active transaction session from createOrder/updateOrder,
@@ -112,9 +130,10 @@ const getDeliveryNoteDocumentNumber = async (
 const createPreparedDeliveryNote = async (
   order: Order,
   orderItems: Awaited<ReturnType<typeof orderItemRepository.listByOrderId>>,
-  session?: ClientSession
+  session?: ClientSession,
+  customNumber?: string
 ) => {
-  const documentNumber = await getDeliveryNoteDocumentNumber(order, session);
+  const documentNumber = await getDeliveryNoteDocumentNumber(order, session, customNumber);
   const pdf = await generateDeliveryNotePdfBuffer(order, orderItems, documentNumber);
 
   return {
@@ -128,7 +147,15 @@ const persistDeliveryNoteOnOrder = async (order: Order, documentNumber: string, 
     return order;
   }
 
-  const updatedOrder = await orderRepository.update(order._id.toString(), { deliveryNote: documentNumber }, session);
+  // The unique index is the backstop when two requests pass the exists check together.
+  const updatedOrder = await orderRepository
+    .update(order._id.toString(), { deliveryNote: documentNumber }, session)
+    .catch((error) => {
+      if (error?.code === 11000) {
+        throw new ConflictError(`เลขที่ใบส่งของ ${documentNumber} ซ้ำกับที่มีอยู่แล้ว`);
+      }
+      throw error;
+    });
   if (!updatedOrder) {
     throw new InternalServerError('ไม่พบคำสั่งซื้อหลังจากสร้างใบส่งของ');
   }
@@ -139,9 +166,17 @@ const persistDeliveryNoteOnOrder = async (order: Order, documentNumber: string, 
 const upsertDeliveryNoteForOrder = async (
   order: Order,
   orderItems: Awaited<ReturnType<typeof orderItemRepository.listByOrderId>>,
-  session?: ClientSession
+  session?: ClientSession,
+  customNumber?: string
 ) => {
-  const { documentNumber, pdf: deliveryNotePdf } = await createPreparedDeliveryNote(order, orderItems, session);
+  const { documentNumber, pdf: deliveryNotePdf } = await createPreparedDeliveryNote(
+    order,
+    orderItems,
+    session,
+    customNumber
+  );
+  // Persist first so a duplicate is rejected before it can overwrite another order's PDF.
+  const updatedOrder = await persistDeliveryNoteOnOrder(order, documentNumber, session);
   await uploadObjectToBucket(
     correctionDepartmentBucketName,
     `DN/${deliveryNotePdf.filename}`,
@@ -149,7 +184,7 @@ const upsertDeliveryNoteForOrder = async (
     deliveryNotePdf.contentType
   );
 
-  return persistDeliveryNoteOnOrder(order, documentNumber, session);
+  return updatedOrder;
 };
 
 // Recomputes items/customer/date fields shared by both the draft and completed-order update
@@ -227,9 +262,10 @@ const applyOrderFieldUpdates = async (
 const generateAndPersistDeliveryNote = async (
   order: Order,
   orderItems: Awaited<ReturnType<typeof orderItemRepository.listByOrderId>>,
-  activeSession: ClientSession
+  activeSession: ClientSession,
+  customNumber?: string
 ) => {
-  const preparedDeliveryNote = await createPreparedDeliveryNote(order, orderItems, activeSession);
+  const preparedDeliveryNote = await createPreparedDeliveryNote(order, orderItems, activeSession, customNumber);
   const completedOrder = await persistDeliveryNoteOnOrder(order, preparedDeliveryNote.documentNumber, activeSession);
   await uploadObjectToBucket(
     correctionDepartmentBucketName,
@@ -267,7 +303,8 @@ const updateDraftOrder = async (
   const { completedOrder, documentNumber } = await generateAndPersistDeliveryNote(
     updatedOrder,
     orderItems,
-    activeSession
+    activeSession,
+    input.deliveryNote
   );
 
   log.info({ orderId: id, status: 'completed', totalAmount, deliveryNote: documentNumber }, 'order updated');
@@ -300,7 +337,8 @@ const updateCompletedOrder = async (
   const { completedOrder, documentNumber } = await generateAndPersistDeliveryNote(
     updatedOrder,
     orderItems,
-    activeSession
+    activeSession,
+    input.deliveryNote
   );
 
   log.info(
@@ -322,7 +360,7 @@ export const orderService = {
         return { order, orderItems };
       }
 
-      const preparedDeliveryNote = await createPreparedDeliveryNote(order, orderItems, session);
+      const preparedDeliveryNote = await createPreparedDeliveryNote(order, orderItems, session, input.deliveryNote);
       const updatedOrder = await persistDeliveryNoteOnOrder(order, preparedDeliveryNote.documentNumber, session);
       await uploadObjectToBucket(
         correctionDepartmentBucketName,
@@ -452,7 +490,7 @@ export const orderService = {
     return generateCustomReceiptPdf(input);
   },
 
-  async createDeliveryNote(orderId: string) {
+  async createDeliveryNote(orderId: string, customNumber?: string) {
     const orderWithItems = await this.getOrderWithItems(orderId);
     if (!orderWithItems) {
       return undefined;
@@ -466,7 +504,7 @@ export const orderService = {
       throw new BadRequestError('คำสั่งซื้อต้องมีอย่างน้อย 1 รายการ');
     }
 
-    const updatedOrder = await upsertDeliveryNoteForOrder(order, orderItems);
+    const updatedOrder = await upsertDeliveryNoteForOrder(order, orderItems, undefined, customNumber);
     log.info({ orderId, deliveryNote: updatedOrder.deliveryNote }, 'delivery note generated');
     return { order: updatedOrder, orderItems };
   },

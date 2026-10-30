@@ -100,6 +100,7 @@ export interface CreateOrderInput {
   dueDate: Date;
   deliveryDate: Date;
   status: CreateOrderStatus;
+  deliveryNote?: string;
   items: CreateOrderItemInput[];
 }
 

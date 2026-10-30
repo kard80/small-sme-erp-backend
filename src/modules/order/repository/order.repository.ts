@@ -28,6 +28,15 @@ export const orderRepository = {
     return order.toObject();
   },
 
+  async existsByDeliveryNote(deliveryNote: string, excludeOrderId?: string, session?: ClientSession) {
+    // Legacy rows may be stored with a .pdf suffix, which maps to the same bucket key.
+    const query: Record<string, unknown> = { deliveryNote: { $in: [deliveryNote, `${deliveryNote}.pdf`] }, deletedAt: null };
+    if (excludeOrderId) {
+      query._id = { $ne: excludeOrderId };
+    }
+    return (await OrderModel.exists(query).session(session ?? null)) !== null;
+  },
+
   async list({ where, pagination, sort }: ListOrdersProps) {
     const { page, pageSize, skip } = pagination;
     const query: Record<string, unknown> = { deletedAt: null };

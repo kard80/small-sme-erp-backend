@@ -13,6 +13,17 @@ const orderItemInputSchema = z.object({
   sellPrice: z.coerce.number().nonnegative()
 });
 
+// Becomes the bucket key (DN/{number}.pdf), so no path separators or .pdf suffix.
+export const customDeliveryNoteSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(50)
+  .regex(/^[^/\\"';%?#\x00-\x1f]+$/, 'เลขที่ใบส่งของมีอักขระที่ไม่อนุญาต')
+  .refine((v) => !/\.pdf$/i.test(v), 'เลขที่ใบส่งของต้องไม่ลงท้ายด้วย .pdf');
+
+export const createDeliveryNoteSchema = z.object({ deliveryNote: customDeliveryNoteSchema.optional() });
+
 export const orderInputSchema = z.object({
   customerId: z.string().regex(/^[0-9a-fA-F]{24}$/),
   customerDepartment: z.string().trim().min(1).optional(),
@@ -21,6 +32,7 @@ export const orderInputSchema = z.object({
   dueDate: thaiDate,
   deliveryDate: thaiDate,
   status: z.enum(['draft', 'completed']),
+  deliveryNote: customDeliveryNoteSchema.optional(),
   items: z.array(orderItemInputSchema).min(1)
 });
 

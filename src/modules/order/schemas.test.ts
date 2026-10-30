@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { orderInputSchema, orderUpdateSchema } from './schemas';
+import { customDeliveryNoteSchema, orderInputSchema, orderUpdateSchema } from './schemas';
 
 const oid = 'a'.repeat(24);
 const item = { productId: oid, productName: 'a', unit: 'kg', quantity: 1, buyPrice: 0, sellPrice: 1 };
@@ -37,3 +37,13 @@ describe('orderInputSchema', () => {
   });
 });
 
+
+describe('customDeliveryNoteSchema', () => {
+  it.each(['MY-001', 'ใบส่ง 12', 'A.B'])('accepts %s', (v) => {
+    expect(customDeliveryNoteSchema.safeParse(v).success).toBe(true);
+  });
+
+  it.each(['', 'a/b', 'a\\b', 'x.pdf', 'x.PDF', 'a"b', 'a;b', 'a?b', 'a'.repeat(51)])('rejects %j', (v) => {
+    expect(customDeliveryNoteSchema.safeParse(v).success).toBe(false);
+  });
+});

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
 import { parseObjectIdParam, paginationSchema, sendZodError } from '../../shared/http';
-import { combinedPurchaseListSchema, customReceiptSchema, orderInputSchema, orderUpdateSchema } from './schemas';
+import { combinedPurchaseListSchema, createDeliveryNoteSchema, customReceiptSchema, orderInputSchema, orderUpdateSchema } from './schemas';
 import { orderService } from './service';
 import { Pagination } from '../../shared/pagination';
 import { ComparableFilter } from '../../shared/filters';
@@ -108,7 +108,12 @@ export const createOrderRouter = () => {
       return res.status(400).json({ error: 'รหัสคำสั่งซื้อไม่ถูกต้อง' });
     }
 
-    const order = await orderService.createDeliveryNote(orderId);
+    const body = createDeliveryNoteSchema.safeParse(req.body ?? {});
+    if (!body.success) {
+      return sendZodError(res, body.error);
+    }
+
+    const order = await orderService.createDeliveryNote(orderId, body.data.deliveryNote);
     if (!order) {
       return res.status(404).json({ error: 'ไม่พบคำสั่งซื้อ' });
     }
