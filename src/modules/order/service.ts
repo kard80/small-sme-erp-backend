@@ -1,4 +1,4 @@
-import { ClientSession } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { productRepository } from '../product/repository';
 import { customersRepository } from '../customers/repository';
 import { orderItemRepository } from './repository/order-item.repository';
@@ -46,6 +46,19 @@ const getCustomerBillingSnapshot = async (customerId: string, session?: ClientSe
     customerBillName: customer.billName,
     customerBillAddress: customer.address
   };
+};
+
+// Cost on a completed order becomes the product's new default cost.
+const syncProductCosts = async (
+  items: { productId: string | Types.ObjectId; buyPrice: number }[],
+  session: ClientSession
+) => {
+  const ids = [...new Set(items.map((i) => String(i.productId)))];
+  const current = new Map((await productRepository.findByIds(ids, session)).map((p) => [String(p._id), p.defaultBuyPrice ?? 0]));
+  const changed = items
+    .filter((i) => current.has(String(i.productId)) && current.get(String(i.productId)) !== i.buyPrice)
+    .map((i) => ({ productId: String(i.productId), buyPrice: i.buyPrice }));
+  await productRepository.setDefaultBuyPrices(changed, session);
 };
 
 const resolveOrderItems = (
@@ -214,6 +227,7 @@ const applyOrderFieldUpdates = async (
 
   let orderItems = input.items
     ? await (async () => {
+        if (nextLifecycle.completedAt) await syncProductCosts(input.items!, activeSession);
         await orderItemRepository.hardDeleteByOrderId(id, activeSession);
         return orderItemRepository.createMany(id, input.items!, nextLifecycle, activeSession);
       })()
@@ -353,6 +367,7 @@ export const orderService = {
     return runInTransaction(async (session) => {
       const customerSnapshot = await getCustomerBillingSnapshot(input.customerId, session);
       const { items, lifecycle, totalAmount, orderInput } = resolveOrderItems(input, customerSnapshot);
+      if (lifecycle.completedAt) await syncProductCosts(items, session);
       const order = await orderRepository.create(orderInput, session);
       const orderItems = await orderItemRepository.createMany(order._id.toString(), items, lifecycle, session);
       if (!order.completedAt) {

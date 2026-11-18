@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../customers/repository', () => ({
   customersRepository: { findById: vi.fn() }
 }));
+vi.mock('../product/repository', () => ({
+  productRepository: { findByIds: vi.fn(), setDefaultBuyPrices: vi.fn() }
+}));
 vi.mock('./repository/order.repository', () => ({
   orderRepository: {
     create: vi.fn(),
@@ -51,6 +54,9 @@ import { createSignedObjectDownloadUrl, uploadObjectToBucket } from '../../share
 import { Pagination } from '../../shared/pagination';
 import { ConflictError, BadRequestError, NotFoundError } from '../../shared/errors';
 
+import { productRepository } from '../product/repository';
+
+const products = vi.mocked(productRepository);
 const customers = vi.mocked(customersRepository);
 const orders = vi.mocked(orderRepository);
 const items = vi.mocked(orderItemRepository);
@@ -89,6 +95,7 @@ beforeEach(() => {
   orders.create.mockImplementation(async (input: any) => ({ _id: orderId, ...input }) as any);
   orders.update.mockImplementation(async (_id: any, patch: any) => order(patch));
   items.createMany.mockResolvedValue([] as any);
+  products.findByIds.mockResolvedValue([]);
   billed.listBilledOrderIds.mockResolvedValue([]);
   billed.isOrderBilled.mockResolvedValue(false);
   vi.mocked(generateDeliveryNoteNumber).mockResolvedValue('DN20260101');
@@ -108,6 +115,22 @@ describe('orderService.createOrder', () => {
     expect(created.completedAt).toBeNull();
     expect(generateDeliveryNoteNumber).not.toHaveBeenCalled();
     expect(uploadObjectToBucket).not.toHaveBeenCalled();
+  });
+
+  it('copies a changed item cost to the product default cost', async () => {
+    products.findByIds.mockResolvedValue([
+      { _id: 'p1', defaultBuyPrice: 1 },
+      { _id: 'p2', defaultBuyPrice: 0.5 }
+    ] as any);
+    await orderService.createOrder(baseInput('completed') as any);
+    // p1 changed 1 -> 1.1, p2 unchanged
+    expect(products.setDefaultBuyPrices).toHaveBeenCalledWith([{ productId: 'p1', buyPrice: 1.1 }], expect.anything());
+  });
+
+  it('does not touch product cost for a draft order', async () => {
+    products.findByIds.mockResolvedValue([{ _id: 'p1', defaultBuyPrice: 1 }] as any);
+    await orderService.createOrder(baseInput('draft') as any);
+    expect(products.setDefaultBuyPrices).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown customer', async () => {

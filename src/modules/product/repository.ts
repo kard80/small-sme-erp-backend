@@ -76,8 +76,20 @@ export const productRepository = {
     return ProductModel.findOne({ _id, status: 'active' }).lean<Product | null>();
   },
 
-  findByIds(ids: string[]) {
-    return ProductModel.find({ _id: { $in: ids } }).select('defaultBuyPrice').lean<Pick<Product, '_id' | 'defaultBuyPrice'>[]>();
+  findByIds(ids: string[], session?: ClientSession) {
+    return ProductModel.find({ _id: { $in: ids } }).session(session ?? null).select('defaultBuyPrice').lean<Pick<Product, '_id' | 'defaultBuyPrice'>[]>();
+  },
+
+  // Sets defaultBuyPrice per product; last entry wins if a product repeats.
+  async setDefaultBuyPrices(entries: { productId: string; buyPrice: number }[], session?: ClientSession) {
+    const latest = new Map(entries.map((e) => [e.productId, e.buyPrice]));
+    if (latest.size === 0) return;
+    await ProductModel.bulkWrite(
+      [...latest].map(([productId, buyPrice]) => ({
+        updateOne: { filter: { _id: productId }, update: { $set: { defaultBuyPrice: buyPrice } } }
+      })),
+      { session }
+    );
   },
 
   findByProductName(productName: string) {
