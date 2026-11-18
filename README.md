@@ -107,7 +107,7 @@ All ERP REST endpoints require `Authorization: Bearer <accessToken>`.
 
 - `POST /api/catalog/products`
 - `POST /api/catalog/products/import-excel` (multipart form-data, file field: `file`)
-- `GET /api/catalog/products?page=1&pageSize=10`
+- `GET /api/catalog/products?page=1&pageSize=10` (this list and `?search=` results include per product `supplierCount` and `averageBuyPrice`: all-time quantity-weighted cost over completed orders, `null` if never sold; `defaultBuyPrice` is updated to the item cost whenever an order is saved as completed)
 - `PATCH /api/catalog/products/:id`
 - `DELETE /api/catalog/products/:id`
 - `POST /api/customers`

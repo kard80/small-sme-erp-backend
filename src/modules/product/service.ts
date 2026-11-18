@@ -32,9 +32,18 @@ interface GetProductHistoryParams {
   deliveryEndDate: string;
 }
 
-const withSupplierCount = async <T extends { _id: unknown }>(products: T[]) => {
-  const counts = await productSuppliersRepository.countByProductIds(products.map((p) => String(p._id)));
-  return products.map((p) => ({ ...p, supplierCount: counts.get(String(p._id)) ?? 0 }));
+const withListStats = async <T extends { _id: unknown }>(products: T[]) => {
+  const ids = products.map((p) => String(p._id));
+  const [counts, averages] = await Promise.all([
+    productSuppliersRepository.countByProductIds(ids),
+    orderItemService.getAverageBuyPrices(ids)
+  ]);
+  return products.map((p) => ({
+    ...p,
+    supplierCount: counts.get(String(p._id)) ?? 0,
+    // null = never sold on a completed order
+    averageBuyPrice: averages.get(String(p._id)) ?? null
+  }));
 };
 
 export const productService = {
@@ -60,7 +69,7 @@ export const productService = {
 
   async listProducts(page?: number, pageSize?: number, countZeroBuyPrice?: boolean) {
     const result = await productRepository.list(page, pageSize, countZeroBuyPrice);
-    return { ...result, data: await withSupplierCount(result.data) };
+    return { ...result, data: await withListStats(result.data) };
   },
 
   listUnits() {
@@ -68,7 +77,7 @@ export const productService = {
   },
 
   async searchProducts(query: string) {
-    return withSupplierCount(await productRepository.search(query));
+    return withListStats(await productRepository.search(query));
   },
 
   async updateProduct(id: string, input: Parameters<typeof productRepository.update>[1]) {

@@ -133,6 +133,24 @@ export const orderItemRepository = {
     return this.listByOrderId(orderId, session);
   },
 
+  // All-time quantity-weighted average cost over completed, non-deleted items. Products
+  // without history are absent from the map.
+  async averageBuyPriceByProductIds(productIds: string[]) {
+    if (productIds.length === 0) return new Map<string, number>();
+    const rows = await OrderItemModel.aggregate<{ _id: Types.ObjectId; totalCost: number; totalQty: number }>([
+      {
+        $match: {
+          productId: { $in: productIds.map((id) => new Types.ObjectId(id)) },
+          deletedAt: null,
+          completedAt: { $ne: null }
+        }
+      },
+      { $group: { _id: '$productId', totalCost: { $sum: '$totalBuyPrice' }, totalQty: { $sum: '$quantity' } } },
+      { $match: { totalQty: { $gt: 0 } } }
+    ]);
+    return new Map(rows.map((r) => [String(r._id), Math.round((r.totalCost / r.totalQty) * 100) / 100]));
+  },
+
   async hardDeleteByOrderId(orderId: string, session?: ClientSession) {
     const removed = await OrderItemModel.find({ orderId })
       .session(session ?? null)

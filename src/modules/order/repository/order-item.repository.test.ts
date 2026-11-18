@@ -31,6 +31,28 @@ describe('orderItemRepository', () => {
     expect(docs[0]).toMatchObject({ totalSellPrice: 7.65, totalBuyPrice: 3.3 });
   });
 
+  it('averageBuyPriceByProductIds weights by quantity over completed items only', async () => {
+    const id = new Types.ObjectId();
+    const agg = vi.spyOn(OrderItemModel, 'aggregate').mockResolvedValue([{ _id: id, totalCost: 10, totalQty: 3 }] as never);
+    const res = await orderItemRepository.averageBuyPriceByProductIds([id.toString()]);
+    expect(res.get(id.toString())).toBe(3.33);
+    const match = (agg.mock.calls[0][0] as any[])[0].$match;
+    expect(match).toMatchObject({ deletedAt: null, completedAt: { $ne: null } });
+    const stages = agg.mock.calls[0][0] as any[];
+    expect(stages[1].$group).toEqual({
+      _id: '$productId',
+      totalCost: { $sum: '$totalBuyPrice' },
+      totalQty: { $sum: '$quantity' }
+    });
+    expect(stages[2].$match).toEqual({ totalQty: { $gt: 0 } });
+  });
+
+  it('averageBuyPriceByProductIds skips the query for no ids', async () => {
+    const agg = vi.spyOn(OrderItemModel, 'aggregate');
+    expect((await orderItemRepository.averageBuyPriceByProductIds([])).size).toBe(0);
+    expect(agg).not.toHaveBeenCalled();
+  });
+
   it('hardDeleteByOrderId really deletes while removeByOrderId only soft-deletes', async () => {
     vi.spyOn(OrderItemModel, 'find').mockReturnValue(chain([{}]));
     const del = vi.spyOn(OrderItemModel, 'deleteMany').mockReturnValue(chain({}));

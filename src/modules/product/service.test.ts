@@ -14,7 +14,7 @@ vi.mock('../supplier/repository', () => ({
   productSuppliersRepository: { countByProductIds: vi.fn() }
 }));
 vi.mock('../order/services/order-item', () => ({
-  orderItemService: { findProductHistory: vi.fn() }
+  orderItemService: { findProductHistory: vi.fn(), getAverageBuyPrices: vi.fn() }
 }));
 
 import { productService } from './service';
@@ -128,8 +128,13 @@ describe('listProducts supplierCount', () => {
   it('adds supplierCount with one count query, 0 when no links', async () => {
     repo.list.mockResolvedValue({ data: [{ _id: 'a' }, { _id: 'b' }], page: 1, pageSize: 2, total: 2, zeroBuyPriceCount: null } as any);
     vi.mocked(productSuppliersRepository.countByProductIds).mockResolvedValue(new Map([['a', 3]]));
+    vi.mocked(orderItemService.getAverageBuyPrices).mockResolvedValue(new Map([['a', 12.35]]));
     const res = await productService.listProducts(1, 2);
-    expect(res.data).toEqual([{ _id: 'a', supplierCount: 3 }, { _id: 'b', supplierCount: 0 }]);
+    expect(res.data).toEqual([
+      { _id: 'a', supplierCount: 3, averageBuyPrice: 12.35 },
+      { _id: 'b', supplierCount: 0, averageBuyPrice: null }
+    ]);
+    expect(orderItemService.getAverageBuyPrices).toHaveBeenCalledWith(['a', 'b']);
     expect(productSuppliersRepository.countByProductIds).toHaveBeenCalledTimes(1);
     expect(productSuppliersRepository.countByProductIds).toHaveBeenCalledWith(['a', 'b']);
   });
