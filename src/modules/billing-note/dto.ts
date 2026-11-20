@@ -29,3 +29,8 @@ export const customDocumentDto = z.object({
   issuedDate: z.coerce.date(),
   orderIds: z.array(objectIdSchema).nonempty('Order IDs cannot be empty')
 });
+
+export const updateBillingNoteDto = z.object({
+  issuedDate: z.coerce.date().optional(),
+  orderIds: z.array(objectIdSchema).nonempty('Order IDs cannot be empty')
+});

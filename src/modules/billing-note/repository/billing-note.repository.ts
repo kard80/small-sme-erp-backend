@@ -44,6 +44,21 @@ class BillingNoteRepository {
     return BillingNoteModel.insertOne(item, { session });
   }
 
+  updateBillingNote(
+    billingNoteId: string,
+    input: { issuedDate?: Date; totalAmount: number },
+    session?: ClientSession
+  ) {
+    return BillingNoteModel.findOneAndUpdate(
+      { _id: billingNoteId, deletedAt: null },
+      {
+        totalAmount: input.totalAmount,
+        ...(input.issuedDate ? { issuedDate: input.issuedDate } : {})
+      },
+      { new: true, session }
+    ).lean<BillingNote | null>();
+  }
+
   setDocumentNumber(billingNoteId: string, documentNumber: string, session?: ClientSession) {
     return BillingNoteModel.findOneAndUpdate(
       { _id: billingNoteId, deletedAt: null },

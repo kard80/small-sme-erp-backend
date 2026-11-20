@@ -123,6 +123,85 @@ export const billingNoteService = {
     return updatedBillingNote ?? billingNoteResp;
   },
 
+  async getBillingNote(billingNoteId: string) {
+    const billingNote = await billingNoteRepository.findById(billingNoteId);
+    if (!billingNote) {
+      throw new NotFoundError('ไม่พบใบแจ้งหนี้');
+    }
+    const [customer, billingNoteOrders] = await Promise.all([
+      customersRepository.findById(billingNote.customerId.toString()),
+      billingNoteOrderRepository.find({ billingNoteId: billingNote._id })
+    ]);
+    const orders = billingNoteOrders.length
+      ? await orderService.listOrders({
+          pagination: new Pagination(1, billingNoteOrders.length),
+          where: {
+            _id: new ComparableFilter<string>({ $in: billingNoteOrders.map((item) => item.orderId.toString()) })
+          },
+          sort: { deliveryDate: 1, deliveryNote: 1 }
+        })
+      : { data: [] as Order[] };
+
+    return { ...billingNote, customerName: customer?.customerName ?? '', orders: orders.data };
+  },
+
+  // Replaces the whole order set of a saved billing note, then re-renders its PDF under the same number.
+  async updateBillingNote(billingNoteId: string, orderIds: string[], issuedDate?: Date) {
+    const billingNote = await billingNoteRepository.findById(billingNoteId);
+    if (!billingNote) {
+      throw new NotFoundError('ไม่พบใบแจ้งหนี้');
+    }
+    if (await receiptNoteBillingNoteRepository.isBillingNoteReceipted(billingNoteId)) {
+      throw new ConflictError('ไม่สามารถแก้ไขใบวางบิลที่ออกใบเสร็จแล้ว');
+    }
+
+    const uniqueOrderIds = [...new Set(orderIds)];
+    const orders = await orderService.listOrders({
+      where: {
+        _id: new ComparableFilter<string>({ $in: uniqueOrderIds }),
+        customerId: new ComparableFilter({ $eq: billingNote.customerId.toString() }),
+        deliveryNote: new ComparableFilter({ $ne: null })
+      },
+      pagination: new Pagination(1, uniqueOrderIds.length),
+      sort: { deliveryNote: 1 }
+    });
+    if (orders.data.length !== uniqueOrderIds.length) {
+      throw new NotFoundError('ไม่พบคำสั่งซื้อบางรายการ');
+    }
+
+    const [currentOrders, billedElsewhere] = await Promise.all([
+      billingNoteOrderRepository.find({ billingNoteId: billingNote._id }),
+      billingNoteOrderRepository.listBilledOrderIds(uniqueOrderIds)
+    ]);
+    const currentOrderIds = new Set(currentOrders.map((item) => item.orderId.toString()));
+    if (billedElsewhere.some((orderId) => !currentOrderIds.has(orderId.toString()))) {
+      throw new ConflictError('มีคำสั่งซื้อที่ถูกวางบิลในใบวางบิลอื่นแล้ว');
+    }
+
+    const totalAmount = orders.data
+      .reduce((sum, order) => sum.add(new Currency(order.totalAmount)), new Currency(0))
+      .toNumber();
+    const updated = await runInTransaction(async (session) => {
+      await billingNoteOrderRepository.deleteByBillingNoteId(billingNoteId, session);
+      await billingNoteOrderRepository.create(
+        { billingNoteId: billingNote._id, orderIds: orders.data.map((order) => order._id) },
+        session
+      );
+      return billingNoteRepository.updateBillingNote(billingNoteId, { issuedDate, totalAmount }, session);
+    });
+    const finalNote = updated ?? billingNote;
+
+    const documentNumber = await this.generateBillingNoteDocument(
+      finalNote.issuedDate,
+      billingNote.customerId.toString(),
+      orders.data,
+      billingNote.documentNumber
+    );
+    const withNumber = await billingNoteRepository.setDocumentNumber(billingNoteId, documentNumber);
+
+    return withNumber ?? finalNote;
+  },
+
   async manualInsertBillingNote(billingNoteId: string) {
     const billingNote = await billingNoteRepository.findById(billingNoteId);
     if (!billingNote) {

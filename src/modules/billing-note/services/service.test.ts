@@ -10,6 +10,7 @@ vi.mock('../repository/billing-note.repository', () => ({
     list: vi.fn(),
     findById: vi.fn(),
     createBillingNote: vi.fn(),
+    updateBillingNote: vi.fn(),
     setDocumentNumber: vi.fn(),
     deleteBillingNote: vi.fn()
   }
@@ -42,6 +43,7 @@ import { billingNoteRepository } from '../repository/billing-note.repository';
 import { billingNoteOrderRepository } from '../repository/billing-note-order.repository';
 import { uploadObjectToBucket } from '../../../shared/gcs';
 import { ConflictError, NotFoundError } from '../../../shared/errors';
+import { receiptNoteBillingNoteRepository } from '../../receipt-note/repository/receipt-note-billing-note.repository';
 
 const listOrders = vi.mocked(orderService.listOrders);
 const notes = vi.mocked(billingNoteRepository);
@@ -108,6 +110,60 @@ describe('createBillingNote', () => {
     expect(notes.createBillingNote.mock.calls[0][0]).toMatchObject({ totalAmount: 0.3 });
     expect(vi.mocked(billingNoteOrderRepository.create).mock.calls[0][0].orderIds).toEqual([o1._id, o2._id]);
     expect(notes.setDocumentNumber).toHaveBeenCalledWith(created._id.toString(), 'BL20260207');
+    expect(uploadObjectToBucket).toHaveBeenCalledWith('bucket', 'BL/BL20260207.pdf', expect.anything(), 'application/pdf');
+  });
+});
+
+describe('updateBillingNote', () => {
+  const noteId = new Types.ObjectId();
+  const customerId = new Types.ObjectId();
+  const existing = { _id: noteId, customerId, issuedDate: new Date('2026-02-10'), documentNumber: 'BL20260207' };
+
+  it('404s for a missing note and 409s once receipted', async () => {
+    notes.findById.mockResolvedValue(null as any);
+    await expect(billingNoteService.updateBillingNote('x', ['a'])).rejects.toThrow(NotFoundError);
+
+    notes.findById.mockResolvedValue(existing as any);
+    vi.mocked(receiptNoteBillingNoteRepository.isBillingNoteReceipted).mockResolvedValue(true);
+    await expect(billingNoteService.updateBillingNote('x', ['a'])).rejects.toThrow(ConflictError);
+    expect(notes.updateBillingNote).not.toHaveBeenCalled();
+  });
+
+  it('404s when an order is missing, not the customer\'s or has no delivery note', async () => {
+    notes.findById.mockResolvedValue(existing as any);
+    vi.mocked(receiptNoteBillingNoteRepository.isBillingNoteReceipted).mockResolvedValue(false);
+    listOrders.mockResolvedValue({ data: [{ _id: new Types.ObjectId() }] } as any);
+    await expect(billingNoteService.updateBillingNote('x', ['a', 'b'])).rejects.toThrow(NotFoundError);
+  });
+
+  it('409s when an order is already on another billing note', async () => {
+    const o1 = { _id: new Types.ObjectId(), totalAmount: 1 };
+    notes.findById.mockResolvedValue(existing as any);
+    vi.mocked(receiptNoteBillingNoteRepository.isBillingNoteReceipted).mockResolvedValue(false);
+    listOrders.mockResolvedValue({ data: [o1] } as any);
+    vi.mocked(billingNoteOrderRepository.find).mockResolvedValue([] as any);
+    vi.mocked(billingNoteOrderRepository.listBilledOrderIds).mockResolvedValue([o1._id]);
+    await expect(billingNoteService.updateBillingNote('x', ['a'])).rejects.toThrow(ConflictError);
+    expect(vi.mocked(billingNoteOrderRepository.deleteByBillingNoteId)).not.toHaveBeenCalled();
+  });
+
+  it('replaces orders, recalculates the total and re-renders under the same number', async () => {
+    const kept = { _id: new Types.ObjectId(), totalAmount: 0.1 };
+    const added = { _id: new Types.ObjectId(), totalAmount: 0.2 };
+    notes.findById.mockResolvedValue(existing as any);
+    vi.mocked(receiptNoteBillingNoteRepository.isBillingNoteReceipted).mockResolvedValue(false);
+    listOrders.mockResolvedValue({ data: [kept, added] } as any);
+    vi.mocked(billingNoteOrderRepository.find).mockResolvedValue([{ orderId: kept._id }] as any);
+    vi.mocked(billingNoteOrderRepository.listBilledOrderIds).mockResolvedValue([kept._id]);
+    notes.updateBillingNote.mockResolvedValue({ ...existing, totalAmount: 0.3 } as any);
+    notes.setDocumentNumber.mockResolvedValue({ ...existing, totalAmount: 0.3 } as any);
+    vi.mocked(customersRepository.findById).mockResolvedValue({ _id: 'c' } as any);
+
+    await billingNoteService.updateBillingNote(noteId.toString(), ['a', 'a', 'b']);
+
+    expect(notes.updateBillingNote.mock.calls[0][1]).toMatchObject({ totalAmount: 0.3 });
+    expect(vi.mocked(billingNoteOrderRepository.deleteByBillingNoteId)).toHaveBeenCalled();
+    expect(vi.mocked(billingNoteOrderRepository.create).mock.calls[0][0].orderIds).toEqual([kept._id, added._id]);
     expect(uploadObjectToBucket).toHaveBeenCalledWith('bucket', 'BL/BL20260207.pdf', expect.anything(), 'application/pdf');
   });
 });

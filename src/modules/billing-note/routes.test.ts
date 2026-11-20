@@ -7,6 +7,8 @@ vi.mock('./services/service', () => ({
     getBillingNotes: vi.fn(),
     getEligibleOrders: vi.fn(),
     createBillingNote: vi.fn(),
+    getBillingNote: vi.fn(),
+    updateBillingNote: vi.fn(),
     getBillingNoteDocumentDownloadUrl: vi.fn(),
     manualInsertBillingNote: vi.fn(),
     deleteBillingNote: vi.fn()
@@ -65,6 +67,31 @@ describe('billing-note routes', () => {
       .set(auth())
       .send({ issuedDate: '2026-01-01', customerId: oid, orderIds: [oid] });
     expect(res.status).toBe(201);
+  });
+
+  it('GET /:id returns the note with its orders only', async () => {
+    expect((await request(app).get('/api/v1/billing-notes/bad').set(auth())).status).toBe(400);
+    vi.mocked(billingNoteService.getBillingNote).mockResolvedValue({
+      _id: oid, customerId: oid, customerName: 'n', issuedDate: 'd', totalAmount: 3, documentNumber: 'BL',
+      orders: [{ _id: oid, totalAmount: 3, deliveryDate: 'd', deliveryNote: 'DN', secret: 'x' }]
+    } as any);
+    const res = await request(app).get(`/api/v1/billing-notes/${oid}`).set(auth());
+    expect(res.status).toBe(200);
+    expect(res.body.orders[0]).toEqual({ _id: oid, totalAmount: 3, deliveryDate: 'd', deliveryNote: 'DN' });
+  });
+
+  it('PUT /:id validates, updates and maps 409', async () => {
+    const url = `/api/v1/billing-notes/${oid}`;
+    expect((await request(app).put('/api/v1/billing-notes/bad').set(auth()).send({ orderIds: [oid] })).status).toBe(400);
+    expect((await request(app).put(url).set(auth()).send({ orderIds: [] })).status).toBe(400);
+
+    vi.mocked(billingNoteService.updateBillingNote).mockResolvedValue({ _id: oid } as any);
+    const res = await request(app).put(url).set(auth()).send({ orderIds: [oid], issuedDate: '2026-02-01' });
+    expect(res.status).toBe(200);
+    expect(vi.mocked(billingNoteService.updateBillingNote).mock.calls[0].slice(0, 2)).toEqual([oid, [oid]]);
+
+    vi.mocked(billingNoteService.updateBillingNote).mockRejectedValue(new ConflictError());
+    expect((await request(app).put(url).set(auth()).send({ orderIds: [oid] })).status).toBe(409);
   });
 
   it('document, regenerate-document and delete validate id and map statuses', async () => {
