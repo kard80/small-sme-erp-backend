@@ -22,4 +22,22 @@ describe('buildDeliveryNoteHtml variants', () => {
     expect(html).not.toContain('ผู้ส่งของ');
     expect(html).toContain('71.00');
   });
+
+  it('drops the quantity and unit columns when showQuantityUnit is false', () => {
+    const variant = { title: 'ใบเสร็จรับเงิน', dateLabel: 'วันที่', showQuantityUnit: false };
+    const html = buildDeliveryNoteHtml(order, items, 'RC1', 71, variant);
+    expect(html).not.toContain('<th class="numeric">จำนวน</th>');
+    expect(html).not.toContain('<th>หน่วย</th>');
+    expect(html).not.toContain('<col class="col-qty"');
+    expect(html).not.toContain('<td class="col-unit"');
+    expect(html).toContain('colspan="1"');
+    expect(html).toContain('ข้าวสาร');
+  });
+
+  it('shows quantity and unit by default', () => {
+    const html = buildDeliveryNoteHtml(order, items, 'DN1', 71);
+    expect(html).toContain('<th class="numeric">จำนวน</th>');
+    expect(html).toContain('<th>หน่วย</th>');
+    expect(html).toContain('colspan="3"');
+  });
 });

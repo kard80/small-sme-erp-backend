@@ -112,6 +112,7 @@ export interface CustomReceiptInput {
   issuedDate: Date;
   customerName: string;
   customerAddress: string;
+  showQuantityUnit?: boolean;
   items: { productName: string; unit: string; quantity: number; sellPrice: number }[];
 }
 
@@ -127,7 +128,7 @@ export const generateCustomReceiptPdf = (input: CustomReceiptInput) => {
     items,
     input.documentNumber,
     total,
-    receiptVariant
+    { ...receiptVariant, showQuantityUnit: input.showQuantityUnit ?? true }
   );
   return renderHtmlToPdf(html);
 };

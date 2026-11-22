@@ -180,6 +180,14 @@ describe('POST /orders/custom-receipt', () => {
     const res = await request(app).post('/api/v1/orders/custom-receipt').set(auth()).send(body);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('application/pdf');
-    expect(orderService.renderCustomReceipt).toHaveBeenCalledWith(expect.objectContaining({ customerAddress: '', documentNumber: 'RC-001' }));
+    expect(orderService.renderCustomReceipt).toHaveBeenCalledWith(expect.objectContaining({ customerAddress: '', documentNumber: 'RC-001', showQuantityUnit: true }));
+  });
+
+  it('passes showQuantityUnit=false through and rejects non-boolean values', async () => {
+    vi.mocked(orderService.renderCustomReceipt).mockResolvedValue(Buffer.from('%PDF'));
+    const res = await request(app).post('/api/v1/orders/custom-receipt').set(auth()).send({ ...body, showQuantityUnit: false });
+    expect(res.status).toBe(200);
+    expect(orderService.renderCustomReceipt).toHaveBeenCalledWith(expect.objectContaining({ showQuantityUnit: false }));
+    expect((await request(app).post('/api/v1/orders/custom-receipt').set(auth()).send({ ...body, showQuantityUnit: 'no' })).status).toBe(400);
   });
 });

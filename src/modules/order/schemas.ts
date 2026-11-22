@@ -50,6 +50,7 @@ export const customReceiptSchema = z.object({
   issuedDate: thaiDate.refine((d) => !Number.isNaN(d.getTime()), 'วันที่ไม่ถูกต้อง'),
   customerName: z.string().trim().min(1).max(200),
   customerAddress: z.string().trim().max(500).default(''),
+  showQuantityUnit: z.boolean().default(true),
   items: z
     .array(
       z.object({

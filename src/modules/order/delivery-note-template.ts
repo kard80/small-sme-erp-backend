@@ -89,19 +89,25 @@ export interface DocumentVariant {
   title: string;
   dateLabel: string;
   signaturesHtml?: string;
+  // false drops the จำนวน/หน่วย columns (default true)
+  showQuantityUnit?: boolean;
 }
 
 const deliveryNoteVariant: DocumentVariant = { title: 'ใบส่งสินค้า', dateLabel: 'วันที่ส่งสินค้า' };
 
-const buildItemRows = (items: TemplateItem[]) => {
+const buildItemRows = (items: TemplateItem[], showQuantityUnit: boolean) => {
   return items
     .map((item, index) => {
       return `
         <tr>
           <td class="col-index">${index + 1}</td>
           <td class="col-product">${escapeHtml(item.productName)}</td>
-          <td class="col-qty numeric">${escapeHtml(String(item.quantity))}</td>
-          <td class="col-unit">${escapeHtml(item.unit)}</td>
+          ${
+            showQuantityUnit
+              ? `<td class="col-qty numeric">${escapeHtml(String(item.quantity))}</td>
+          <td class="col-unit">${escapeHtml(item.unit)}</td>`
+              : ''
+          }
           <td class="col-price numeric">${formatCurrency(item.sellPrice)}</td>
           <td class="col-total numeric">${formatCurrency(item.totalSellPrice)}</td>
         </tr>
@@ -118,7 +124,8 @@ export const buildDeliveryNoteHtml = (
   variant: DocumentVariant = deliveryNoteVariant
 ) => {
   const deliveryDate = formatThaiDate(order.deliveryDate);
-  const rowsMarkup = buildItemRows(items);
+  const showQuantityUnit = variant.showQuantityUnit ?? true;
+  const rowsMarkup = buildItemRows(items, showQuantityUnit);
   const amountInThaiText = convertAmountToThaiText(orderTotal);
 
   return `<!DOCTYPE html>
@@ -453,9 +460,8 @@ export const buildDeliveryNoteHtml = (
       <table aria-label="${escapeHtml(`รายการสินค้าใน${variant.title}`)}">
         <colgroup>
           <col class="col-index" />
-          <col class="col-product" />
-          <col class="col-qty" />
-          <col class="col-unit" />
+          <col class="col-product"${showQuantityUnit ? '' : ' style="width: 60%"'} />
+          ${showQuantityUnit ? '<col class="col-qty" />\n          <col class="col-unit" />' : ''}
           <col class="col-price" />
           <col class="col-total" />
         </colgroup>
@@ -463,8 +469,7 @@ export const buildDeliveryNoteHtml = (
           <tr>
             <th>ลำดับ</th>
             <th>รายการ</th>
-            <th class="numeric">จำนวน</th>
-            <th>หน่วย</th>
+            ${showQuantityUnit ? '<th class="numeric">จำนวน</th>\n            <th>หน่วย</th>' : ''}
             <th class="numeric">ราคา</th>
             <th class="numeric">รวม</th>
           </tr>
@@ -473,7 +478,7 @@ export const buildDeliveryNoteHtml = (
           ${rowsMarkup}
           <tr class="totals-row">
             <td class="words-label">(ตัวอักษร)</td>
-            <td colspan="3" class="words-value"><span class="words-value-text">(${escapeHtml(amountInThaiText)})</span></td>
+            <td colspan="${showQuantityUnit ? 3 : 1}" class="words-value"><span class="words-value-text">(${escapeHtml(amountInThaiText)})</span></td>
             <td class="totals-label">รวมเงิน</td>
             <td class="numeric totals-value">${formatCurrency(orderTotal)}</td>
           </tr>
