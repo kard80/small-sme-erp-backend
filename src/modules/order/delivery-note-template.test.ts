@@ -31,6 +31,8 @@ describe('buildDeliveryNoteHtml variants', () => {
     expect(html).not.toContain('<col class="col-qty"');
     expect(html).not.toContain('<td class="col-unit"');
     expect(html).toContain('colspan="1"');
+    expect(html).toContain('<th class="numeric" colspan="2">จำนวนเงิน</th>');
+    expect(html).not.toContain('<th class="numeric">ราคา</th>');
     expect(html).toContain('ข้าวสาร');
   });
 

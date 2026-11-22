@@ -89,7 +89,7 @@ export interface DocumentVariant {
   title: string;
   dateLabel: string;
   signaturesHtml?: string;
-  // false drops the จำนวน/หน่วย columns (default true)
+  // false drops the จำนวน/หน่วย columns and merges ราคา/รวม into จำนวนเงิน (default true)
   showQuantityUnit?: boolean;
 }
 
@@ -108,8 +108,13 @@ const buildItemRows = (items: TemplateItem[], showQuantityUnit: boolean) => {
           <td class="col-unit">${escapeHtml(item.unit)}</td>`
               : ''
           }
-          <td class="col-price numeric">${formatCurrency(item.sellPrice)}</td>
-          <td class="col-total numeric">${formatCurrency(item.totalSellPrice)}</td>
+          ${
+            showQuantityUnit
+              ? `<td class="col-price numeric">${formatCurrency(item.sellPrice)}</td>
+          <td class="col-total numeric">${formatCurrency(item.totalSellPrice)}</td>`
+              : // price == total without a quantity, so one merged จำนวนเงิน cell spans both columns
+                `<td class="col-total numeric" colspan="2">${formatCurrency(item.totalSellPrice)}</td>`
+          }
         </tr>
       `;
     })
@@ -470,8 +475,11 @@ export const buildDeliveryNoteHtml = (
             <th>ลำดับ</th>
             <th>รายการ</th>
             ${showQuantityUnit ? '<th class="numeric">จำนวน</th>\n            <th>หน่วย</th>' : ''}
-            <th class="numeric">ราคา</th>
-            <th class="numeric">รวม</th>
+            ${
+              showQuantityUnit
+                ? '<th class="numeric">ราคา</th>\n            <th class="numeric">รวม</th>'
+                : '<th class="numeric" colspan="2">จำนวนเงิน</th>'
+            }
           </tr>
         </thead>
         <tbody>
