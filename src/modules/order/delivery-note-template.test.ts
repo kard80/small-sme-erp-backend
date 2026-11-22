@@ -33,6 +33,8 @@ describe('buildDeliveryNoteHtml variants', () => {
     expect(html).toContain('colspan="1"');
     expect(html).toContain('<th class="numeric" colspan="2">จำนวนเงิน</th>');
     expect(html).not.toContain('<th class="numeric">ราคา</th>');
+    expect(html).toContain('<td class="col-total numeric" colspan="2">71.00</td>');
+    expect(html).not.toContain('<td class="col-price');
     expect(html).toContain('ข้าวสาร');
   });
 
